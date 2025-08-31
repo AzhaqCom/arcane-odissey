@@ -1,0 +1,84 @@
+/**
+ * VARIABLES CSS - Scene System UI
+ * Palette de couleurs et variables globales
+ */
+
+:root {
+  /* === COULEURS PRINCIPALES === */
+  --primary-bg: #19212d;
+  --primary-gradient: linear-gradient(135deg, #1f2937, #374151);
+  --secondary-bg: #1f2937;
+  --tertiary-bg: #374151;
+  
+  /* === COULEURS DE TEXTE === */
+  --text-primary: #f8fafc;       /* Blanc cassé pour titre */
+  --text-secondary: #cbd5e1;     /* Gris clair pour texte normal */
+  --text-muted: #64748b;         /* Gris pour texte secondaire */
+  --text-accent: #60a5fa;        /* Bleu clair pour accents */
+  
+  /* === COULEURS D'INTERFACE === */
+  --border-primary: #475569;     /* Bordures principales */
+  --border-secondary: #334155;   /* Bordures secondaires */
+  --hover-bg: #475569;           /* Fond au survol */
+  --active-bg: #60a5fa;          /* Fond actif/sélectionné */
+  
+  /* === COULEURS FONCTIONNELLES === */
+  --success-color: #10b981;      /* Vert pour succès */
+  --warning-color: #f59e0b;      /* Orange pour attention */
+  --danger-color: #ef4444;       /* Rouge pour danger */
+  --info-color: #3b82f6;         /* Bleu pour info */
+  
+  /* === ESPACEMENTS === */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-xxl: 48px;
+  
+  /* === RAYONS DE BORDURE === */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  
+  /* === OMBRES === */
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.5);
+  
+  /* === TYPOGRAPHIE === */
+  --font-family-primary: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-family-heading: 'Inter', sans-serif;
+  
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-md: 16px;
+  --font-size-lg: 18px;
+  --font-size-xl: 20px;
+  --font-size-xxl: 24px;
+  --font-size-title: 28px;
+  
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  
+  /* === DIMENSIONS LAYOUT === */
+  --scene-max-width: 1200px;
+  --status-corner-height: 40px;
+  --game-hotbar-width: 70px;
+  --game-log-height: 200px;
+  
+  /* === TRANSITIONS === */
+  --transition-fast: 0.15s ease-out;
+  --transition-normal: 0.2s ease-out;
+  --transition-slow: 0.3s ease-out;
+  
+  /* === Z-INDEX === */
+  --z-background: 0;
+  --z-content: 1;
+  --z-overlay: 10;
+  --z-modal: 20;
+  --z-tooltip: 30;
+}

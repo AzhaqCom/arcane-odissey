@@ -1,0 +1,175 @@
+/* ===== THÈME PRINCIPAL ===== */
+:root {
+  /* Couleurs de base */
+  --color-bg-primary: #19212d;    /* Fond principal */
+  --color-bg-secondary: #1f2937;  /* Panneaux, cartes */
+  --color-bg-accent: #374151;     /* Éléments interactifs */
+  
+  /* Couleurs de texte */
+  --color-text-primary: #f9fafb;    /* Blanc cassé pour titres */
+  --color-text-secondary: #d1d5db;  /* Gris clair pour contenu */
+  --color-text-muted: #9ca3af;      /* Gris pour infos secondaires */
+  
+  /* Couleurs fonctionnelles */
+  --color-success: #10b981;      /* Vert pour succès/heal */
+  --color-danger: #ef4444;       /* Rouge pour dégâts/danger */
+  --color-warning: #f59e0b;      /* Orange pour attention */
+  --color-info: #3b82f6;        /* Bleu pour info */
+  
+  /* Bordures et séparateurs */
+  --border-color: #4b5563;
+  --border-radius: 8px;
+  --border-radius-sm: 4px;
+  
+  /* Espacement standardisé */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+}
+
+/* ===== BASE GLOBALE ===== */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-secondary);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.6;
+  margin: 0;
+  padding: 0;
+}
+
+/* ===== BOUTONS STANDARDISÉS ===== */
+.btn {
+  background-color: var(--color-bg-accent);
+  color: var(--color-text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.btn:hover {
+  background-color: #4b5563;
+  transform: translateY(-1px);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-primary {
+  background-color: var(--color-info);
+  border-color: var(--color-info);
+}
+
+.btn-success {
+  background-color: var(--color-success);
+  border-color: var(--color-success);
+}
+
+.btn-danger {
+  background-color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+.btn-warning {
+  background-color: var(--color-warning);
+  border-color: var(--color-warning);
+  color: var(--color-bg-primary);
+}
+
+/* ===== PANNEAUX ET CARTES ===== */
+.panel {
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: var(--spacing-md);
+}
+
+.card {
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+/* ===== SCÈNES STANDARDISÉES ===== */
+.scene-container {
+  background-color: var(--color-bg-primary);
+  min-height: 100vh;
+  padding: var(--spacing-md);
+}
+
+.scene-content {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.scene-title {
+  color: var(--color-text-primary);
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: var(--spacing-md);
+  text-align: center;
+}
+
+.scene-description {
+  color: var(--color-text-secondary);
+  font-size: 16px;
+  margin-bottom: var(--spacing-lg);
+  line-height: 1.7;
+}
+
+/* ===== LISTES DE CHOIX ===== */
+.choice-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-lg);
+}
+
+.choice-button {
+  background-color: var(--color-bg-accent);
+  color: var(--color-text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  padding: var(--spacing-md);
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.choice-button:hover {
+  background-color: #4b5563;
+  border-color: var(--color-info);
+}
+
+.choice-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+
+
+/* ===== UTILITAIRES ===== */
+.text-center { text-align: center; }
+.text-muted { color: var(--color-text-muted); }
+.mb-sm { margin-bottom: var(--spacing-sm); }
+.mb-md { margin-bottom: var(--spacing-md); }
+.mb-lg { margin-bottom: var(--spacing-lg); }
+.mt-sm { margin-top: var(--spacing-sm); }
+.mt-md { margin-top: var(--spacing-md); }
+.mt-lg { margin-top: var(--spacing-lg); }

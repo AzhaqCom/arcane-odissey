@@ -1,0 +1,102 @@
+/**
+ * DOMAIN ENTITY - Character
+ * Logique métier pure pour un personnage, sans dépendances infrastructure.
+ */
+import type { AbilityScores, InventorySpec, Position, CharacterCreationProps, ClassSpec } from '../types/Character';
+import { SpellSlots } from './Spell';
+
+// Constantes de progression (déplacées dans le domaine)
+const PROFICIENCY_BONUS_PER_LEVEL: Record<number, number> = {
+  1: 2, 2: 2, 3: 2, 4: 2,
+  5: 3, 6: 3, 7: 3, 8: 3,
+  9: 4, 10: 4, 11: 4, 12: 4,
+  13: 5, 14: 5, 15: 5, 16: 5,
+  17: 6, 18: 6, 19: 6, 20: 6
+};
+
+const XP_FOR_LEVEL: Record<number, number> = {
+  1: 0, 2: 300, 3: 900, 4: 2700, 5: 6500,
+  6: 14000, 7: 23000, 8: 34000, 9: 48000, 10: 64000,
+  11: 85000, 12: 100000, 13: 120000, 14: 140000, 15: 165000,
+  16: 195000, 17: 225000, 18: 265000, 19: 305000, 20: 355000
+};
+
+export class Character {
+  public readonly id: string;
+  public readonly name: string;
+  public readonly level: number;
+  public readonly xp: number;
+  public readonly classId: string;
+  public readonly classSpec: ClassSpec;
+  public readonly raceId: string;
+  public readonly baseStats: AbilityScores;
+  public readonly gold: number;
+  public readonly position?: Position;
+  public readonly inventory: InventorySpec;
+  
+  public currentHP: number;
+  public readonly maxHP: number;
+  public readonly armorClass: number;
+  public readonly speed: number;
+  
+  public readonly spellSlots: SpellSlots;
+  public readonly knownSpells: readonly string[];
+  public preparedSpells: readonly string[];
+
+  constructor(props: CharacterCreationProps, classSpec: ClassSpec) {
+    this.id = props.id;
+    this.name = props.name;
+    this.level = props.level;
+    this.xp = props.xp;
+    this.classId = props.classId;
+    this.classSpec = classSpec;
+    this.raceId = props.raceId;
+    this.baseStats = props.baseStats;
+    this.gold = props.gold;
+    this.position = props.position;
+    this.inventory = props.inventory;
+    this.currentHP = props.currentHP;
+
+    // Calcul des stats dérivées
+    this.maxHP = this.calculateMaxHp();
+    this.armorClass = 10 + this.getAbilityModifiers().dexterity;
+    this.speed = 6;
+
+    // Initialisation de la magie
+    this.knownSpells = props.knownSpellIds || [];
+    this.preparedSpells = props.preparedSpells || [];
+    this.spellSlots = new SpellSlots();
+  }
+
+  public getProficiencyBonus(): number {
+    return PROFICIENCY_BONUS_PER_LEVEL[this.level] || 0;
+  }
+
+  public getAbilityModifiers(): Record<keyof AbilityScores, number> {
+    const modifiers = {} as Record<keyof AbilityScores, number>;
+    for (const key in this.baseStats) {
+      const abilityKey = key as keyof AbilityScores;
+      modifiers[abilityKey] = Math.floor((this.baseStats[abilityKey] - 10) / 2);
+    }
+    return modifiers;
+  }
+
+  private calculateMaxHp(): number {
+    const constitutionModifier = this.getAbilityModifiers().constitution;
+    // Premier niveau: dé de vie max + mod. constit.
+    const firstLevelHp = this.classSpec.hitDie + constitutionModifier;
+    // Niveaux suivants: moyenne du dé de vie + mod. constit.
+    const otherLevelsHp = (this.level - 1) * (Math.floor(this.classSpec.hitDie / 2) + 1 + constitutionModifier);
+    return firstLevelHp + otherLevelsHp;
+  }
+  
+  public get isPlayer(): boolean {
+      // TODO: A définir plus proprement
+      return true;
+  }
+  
+  public get spellcastingAbility() {
+      return this.classSpec.spellcastingAbility;
+  }
+  // ... autres méthodes de logique métier (takeDamage, heal, etc.)
+}

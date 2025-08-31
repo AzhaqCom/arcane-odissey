@@ -1,0 +1,218 @@
+/**
+ * LAYOUT CSS - Structure principale du Scene System
+ * Layout principal avec StatusCorner, GameHotbar et contenu central
+ */
+
+/* === RESET ET BASE === */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100vh;
+  overflow: hidden; /* Pas de scroll global */
+  font-family: var(--font-family-primary);
+  background: var(--primary-gradient);
+  color: var(--text-secondary);
+}
+
+/* === CONTAINER PRINCIPAL === */
+.game-app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  background: var(--primary-gradient);
+  position: relative;
+}
+
+/* === STATUS CORNER - Centré en haut === */
+.status-corner {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  height: var(--status-corner-height);
+  background: rgba(31, 41, 55, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-secondary);
+  border-top: none;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  padding: var(--spacing-sm) var(--spacing-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xl);
+  z-index: var(--z-overlay);
+  box-shadow: var(--shadow-md);
+}
+.status-corner-content{
+  display: flex;
+}
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.status-item .status-icon {
+  font-size: var(--font-size-md);
+}
+
+.status-value {
+  color: var(--text-accent);
+}
+
+/* === GAME HOTBAR - Droite verticale === */
+.game-hotbar {
+  position: fixed;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  width: var(--game-hotbar-width);
+  background: rgba(31, 41, 55, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-sm) ;
+  z-index: var(--z-overlay);
+  box-shadow: var(--shadow-md);
+}
+.hotbar-buttons{
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.hotbar-button {
+  width: 100%;
+  aspect-ratio: 1;
+  background: transparent;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: var(--font-size-lg);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hotbar-button:hover {
+  background: var(--hover-bg);
+  border-color: var(--text-accent);
+  color: var(--text-accent);
+  transform: scale(1.05);
+}
+
+.hotbar-button.active {
+  background: var(--active-bg);
+  border-color: var(--active-bg);
+  color: white;
+}
+
+/* === ZONE CONTENU PRINCIPAL === */
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: calc(var(--status-corner-height) + var(--spacing-lg));
+  padding-bottom: var(--spacing-lg);
+  padding-left: var(--spacing-lg);
+  padding-right: calc(var(--game-hotbar-width) + var(--spacing-xl));
+  overflow: hidden;
+}
+
+/* === SCENE CONTAINER - Max width 1200px === */
+.scene-container {
+  width: 100%;
+  max-width: var(--scene-max-width);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  overflow: hidden;
+}
+
+/* === SCENE CONTENT BOX === */
+.scene-content {
+  background: rgba(31, 41, 55, 0.8);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-xl);
+  box-shadow: var(--shadow-lg);
+  overflow-y: auto;
+  max-height: calc(100vh - var(--status-corner-height) - var(--game-log-height) - var(--spacing-xxl) * 3);
+}
+
+/* === GAME LOG CONTAINER === */
+.game-log-container {
+  height: var(--game-log-height);
+  background: rgba(31, 41, 55, 0.8);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-lg);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.game-log-header {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-muted);
+  margin-bottom: var(--spacing-md);
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 1px solid var(--border-secondary);
+}
+
+.game-log-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar pour le game log */
+.game-log-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.game-log-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.game-log-content::-webkit-scrollbar-thumb {
+  background: var(--border-primary);
+  border-radius: 3px;
+}
+
+.game-log-content::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* === EXCEPTION COMBAT - Full width === */
+.game-app.combat-mode .main-content {
+  padding-left: 0;
+  padding-right: 0px;
+  padding-top:  0;
+  padding-bottom: 0;
+}
+
+.game-app.combat-mode .scene-container {
+  max-width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.game-app.combat-mode .game-log-container {
+  display: none; /* GameLog intégré dans l'interface combat */
+}

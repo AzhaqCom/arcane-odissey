@@ -1,0 +1,329 @@
+/**
+ * COMPONENTS CSS - Styles des composants UI
+ * GameLog, boutons, notifications, etc.
+ */
+
+/* === ENTITY GRID CARDS === */
+.grid-entity-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  height: 100%;
+  justify-content: center;
+  font-size: 10px;
+  padding: 2px;
+}
+
+.grid-entity-card .entity-name {
+  font-weight: bold;
+  font-size: 11px;
+  text-align: center;
+  line-height: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  color: #475569;
+  text-wrap: auto;
+}
+
+.entity-hp-bar {
+  width: 80%;
+  height: 4px;
+  background-color: #ccc;
+  border-radius: 2px;
+  overflow: hidden;
+  position: relative;
+}
+
+.entity-hp-fill {
+  height: 100%;
+  transition: width 0.3s ease, background-color 0.3s ease;
+  border-radius: 2px;
+}
+
+.entity-hp-text {
+  font-size: 8px;
+  color: #333;
+  font-weight: 500;
+  text-align: center;
+  line-height: 1;
+}
+
+/* === GAME LOG ENTRIES === */
+.game-log-entry {
+  padding: var(--spacing-sm) 0;
+  border-bottom: 1px solid rgba(71, 85, 105, 0.3);
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+  animation: fadeInUp 0.3s ease-out;
+}
+
+.game-log-entry:last-child {
+  border-bottom: none;
+}
+
+.game-log-entry.system {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.game-log-entry.action {
+  color: var(--text-secondary);
+}
+
+.game-log-entry.combat {
+  color: var(--danger-color);
+  font-weight: var(--font-weight-medium);
+}
+
+.game-log-entry.spell {
+  color: var(--text-accent);
+  font-weight: var(--font-weight-medium);
+}
+
+.game-log-entry.success {
+  color: var(--success-color);
+  font-weight: var(--font-weight-medium);
+}
+
+.game-log-entry.warning {
+  color: var(--warning-color);
+}
+
+/* Timestamp dans le log */
+.log-timestamp {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  margin-right: var(--spacing-sm);
+}
+
+/* === NOTIFICATIONS SYSTEM === */
+.notification-container {
+  position: fixed;
+  top: calc(var(--status-corner-height) + var(--spacing-lg));
+  right: calc(var(--game-hotbar-width) + var(--spacing-xl));
+  z-index: var(--z-tooltip);
+  pointer-events: none;
+}
+
+.notification {
+  background: rgba(31, 41, 55, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md) var(--spacing-lg);
+  margin-bottom: var(--spacing-md);
+  box-shadow: var(--shadow-lg);
+  min-width: 300px;
+  animation: slideInRight 0.3s ease-out;
+}
+
+.notification.success {
+  border-left: 4px solid var(--success-color);
+}
+
+.notification.warning {
+  border-left: 4px solid var(--warning-color);
+}
+
+.notification.error {
+  border-left: 4px solid var(--danger-color);
+}
+
+.notification.info {
+  border-left: 4px solid var(--info-color);
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* === LOADING STATES === */
+.loading-spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border-primary);
+  border-radius: 50%;
+  border-top-color: var(--text-accent);
+  animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-text {
+  color: var(--text-muted);
+  font-style: italic;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  justify-content: center;
+  padding: var(--spacing-xl);
+}
+
+/* === TOOLTIPS === */
+.tooltip {
+  position: relative;
+  cursor: help;
+}
+
+.tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-normal);
+  z-index: var(--z-tooltip);
+}
+
+.tooltip:hover::after {
+  opacity: 1;
+}
+
+/* === MODAL OVERLAY === */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(5px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal);
+  animation: fadeIn 0.2s ease-out;
+}
+
+.modal-content {
+  background: var(--secondary-bg);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-xl);
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+  animation: scaleIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* === PROGRESS BARS === */
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: var(--border-secondary);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--text-accent);
+  border-radius: var(--radius-sm);
+  transition: width var(--transition-normal);
+}
+
+.progress-fill.health {
+  background: var(--success-color);
+}
+
+.progress-fill.mana {
+  background: var(--info-color);
+}
+
+.progress-fill.experience {
+  background: var(--warning-color);
+}
+
+/* === BADGES === */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  background: var(--border-secondary);
+  color: var(--text-secondary);
+}
+
+.badge.primary {
+  background: var(--text-accent);
+  color: white;
+}
+
+.badge.success {
+  background: var(--success-color);
+  color: white;
+}
+
+.badge.warning {
+  background: var(--warning-color);
+  color: white;
+}
+
+.badge.danger {
+  background: var(--danger-color);
+  color: white;
+}
+
+/* === INPUTS (pour plus tard) === */
+.input-field {
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  color: var(--text-secondary);
+  font-size: var(--font-size-md);
+  font-family: var(--font-family-primary);
+  transition: all var(--transition-normal);
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: var(--text-accent);
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.1);
+}
+
+.input-field::placeholder {
+  color: var(--text-muted);
+}

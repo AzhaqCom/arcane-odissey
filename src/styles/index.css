@@ -1,0 +1,19 @@
+/**
+ * MAIN CSS - Import de tous les styles Scene System
+ * Point d'entrée principal pour tous les styles
+ */
+
+/* Import des variables en premier */
+@import './variables.css';
+
+/* Layout principal */
+@import './layout.css';
+
+/* Composants UI */
+@import './components.css';
+
+/* Styles spécifiques aux scènes */
+@import './scenes.css';
+
+/* Import de la police Inter depuis Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
