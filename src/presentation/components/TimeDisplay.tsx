@@ -1,5 +1,6 @@
 import React from 'react';
 import type { GameTime } from '../../domain/entities';
+import { TimeOfDay } from '../../domain/entities/TimeOfDay';
 
 interface TimeDisplayProps {
   gameTime: GameTime;
@@ -18,36 +19,8 @@ export const TimeDisplay: React.FC<TimeDisplayProps> = ({
   // Formatage du temps
   const formattedTime = `Jour ${gameTime.day} - ${gameTime.hour.toString().padStart(2, '0')}:${gameTime.minute.toString().padStart(2, '0')}`;
   
-  // Détermination de la période
-  const getTimeOfDay = () => {
-    const hour = gameTime.hour;
-    if (hour >= 5 && hour < 8) return 'dawn';
-    if (hour >= 8 && hour < 18) return 'day';
-    if (hour >= 18 && hour < 21) return 'dusk';
-    return 'night';
-  };
-  
-  const timeOfDay = getTimeOfDay();
-
-  const getTimeIcon = () => {
-    switch (timeOfDay) {
-      case 'dawn': return '🌅';
-      case 'day': return '☀️';
-      case 'dusk': return '🌆';
-      case 'night': return '🌙';
-      default: return '⏰';
-    }
-  };
-
-  const getTimeOfDayLabel = () => {
-    switch (timeOfDay) {
-      case 'dawn': return 'Aube';
-      case 'day': return 'Jour';
-      case 'dusk': return 'Crépuscule';
-      case 'night': return 'Nuit';
-      default: return '';
-    }
-  };
+  // Déléguer logique temporelle à l'entité Domain
+  const timeOfDayDisplay = TimeOfDay.getDisplayDataFromHour(gameTime.hour);
 
   return (
     <div className={`time-display ${className}`}>
@@ -55,7 +28,7 @@ export const TimeDisplay: React.FC<TimeDisplayProps> = ({
         <span className="time-text">{formattedTime}</span>
         {showDayNight && (
           <span className="time-period">
-            {getTimeIcon()} {getTimeOfDayLabel()}
+            {timeOfDayDisplay.icon} {timeOfDayDisplay.label}
           </span>
         )}
       </div>

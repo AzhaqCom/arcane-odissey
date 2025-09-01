@@ -42,7 +42,7 @@ export class GameSessionUseCase {
   // Configuration par défaut (logique métier centralisée)
   private readonly DEFAULT_CONFIG: DefaultGameConfiguration = {
     playerCharacterId: 'Elarion',
-    startingSceneId: 'forest_entrance',
+    startingSceneId: 'forest_ambush',
     difficulty: 'normal'
   };
 

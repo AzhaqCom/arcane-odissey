@@ -34,14 +34,14 @@ export class Character {
   public readonly position?: Position;
   public readonly inventory: InventorySpec;
   
-  public currentHP: number;
+  public readonly currentHP: number;
   public readonly maxHP: number;
   public readonly armorClass: number;
   public readonly speed: number;
   
   public readonly spellSlots: SpellSlots;
   public readonly knownSpells: readonly string[];
-  public preparedSpells: readonly string[];
+  public readonly preparedSpells: readonly string[];
 
   constructor(props: CharacterCreationProps, classSpec: ClassSpec) {
     this.id = props.id;
@@ -98,5 +98,54 @@ export class Character {
   public get spellcastingAbility() {
       return this.classSpec.spellcastingAbility;
   }
-  // ... autres méthodes de logique métier (takeDamage, heal, etc.)
+  
+  /**
+   * PHASE 1 - ACTION 1.2.1: Méthodes immutables pour Character
+   * Pattern with...() pour respecter Gemini #1
+   */
+  withHP(newCurrentHP: number): Character {
+    const props: CharacterCreationProps = {
+      id: this.id,
+      name: this.name,
+      level: this.level,
+      xp: this.xp,
+      classId: this.classId,
+      raceId: this.raceId,
+      baseStats: this.baseStats,
+      gold: this.gold,
+      position: this.position,
+      inventory: this.inventory,
+      currentHP: Math.max(0, Math.min(this.maxHP, newCurrentHP)),
+      knownSpellIds: [...this.knownSpells],
+      preparedSpells: [...this.preparedSpells]
+    };
+    return new Character(props, this.classSpec);
+  }
+  
+  withPreparedSpells(newPreparedSpells: readonly string[]): Character {
+    const props: CharacterCreationProps = {
+      id: this.id,
+      name: this.name,
+      level: this.level,
+      xp: this.xp,
+      classId: this.classId,
+      raceId: this.raceId,
+      baseStats: this.baseStats,
+      gold: this.gold,
+      position: this.position,
+      inventory: this.inventory,
+      currentHP: this.currentHP,
+      knownSpellIds: [...this.knownSpells],
+      preparedSpells: [...newPreparedSpells]
+    };
+    return new Character(props, this.classSpec);
+  }
+  
+  takeDamage(damage: number): Character {
+    return this.withHP(this.currentHP - damage);
+  }
+  
+  heal(healAmount: number): Character {
+    return this.withHP(this.currentHP + healAmount);
+  }
 }

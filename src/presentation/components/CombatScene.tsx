@@ -28,6 +28,11 @@ interface CombatSceneProps {
   isMovementMode: boolean;
   isLoading: boolean;
   
+  // PHASE 2 - ACTION 2.2.1: Nouvelles props Domain centralisées
+  healthDisplays: Map<string, any>;
+  reachableCells: Set<string>;
+  gridDimensions: { width: number; height: number };
+  
   // Actions de grille
   onCellClick: (position: Position) => void;
   onMovementCancel: () => void;
@@ -56,6 +61,9 @@ export const CombatScene: React.FC<CombatSceneProps> = ({
   phase,
   isMovementMode,
   isLoading,
+  healthDisplays,
+  reachableCells,
+  gridDimensions,
   onCellClick,
   onMovementCancel,
   combatPanelProps,
@@ -103,9 +111,11 @@ export const CombatScene: React.FC<CombatSceneProps> = ({
         <div className="combat-battlefield">
           {combat ? (
             <CombatGrid
-              combat={combat}
               entities={entities}
+              healthDisplays={healthDisplays}
+              reachableCells={reachableCells}
               isMovementMode={isMovementMode}
+              gridDimensions={gridDimensions}
               onCellClick={onCellClick}
               onMovementCancel={onMovementCancel}
             />

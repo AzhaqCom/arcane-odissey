@@ -264,7 +264,7 @@ export class GameSessionRepository implements IGameSessionRepository {
     const playerCharacter = this.deserializeCharacter(serialized.playerCharacter);
     
     // Créer la session de base
-    const session = new GameSession(
+    let session = new GameSession(
       serialized.sessionId,
       playerCharacter,
       serialized.currentSceneId,
@@ -292,7 +292,7 @@ export class GameSessionRepository implements IGameSessionRepository {
     // Restaurer les compagnons
     for (const companionData of serialized.companions) {
       const companion = this.deserializeCharacter(companionData);
-      session.addCompanion(companion);
+      session = session.withAddedCompanion(companion);
     }
 
     return session;

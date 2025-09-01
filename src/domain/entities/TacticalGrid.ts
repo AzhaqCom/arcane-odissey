@@ -179,47 +179,81 @@ export class TacticalGrid {
   }
 
   /**
-   * Occuper une case avec une entité
+   * PHASE 1 - ACTION 1.3.2: Occuper une case avec une entité (immutable)
+   * Retourne nouvelle instance selon Gemini #2
    */
-  occupyCell(pos: GridPosition, entityId: string): boolean {
-    if (!this.isCellFree(pos)) return false;
+  occupyCell(pos: GridPosition, entityId: string): TacticalGrid | null {
+    if (!this.isCellFree(pos)) return null;
     
     const cell = this.getCell(pos);
-    if (!cell) return false;
+    if (!cell) return null;
     
-    cell.occupiedBy = entityId;
-    return true;
+    // Créer nouvelle grille avec cellule occupée
+    const newGrid = this._deepClone();
+    const newCell = newGrid.getCell(pos);
+    if (newCell) {
+      newCell.occupiedBy = entityId;
+    }
+    return newGrid;
   }
 
   /**
-   * Libérer une case
+   * PHASE 1 - ACTION 1.3.2: Libérer une case (immutable)
+   * Retourne nouvelle instance selon Gemini #2
    */
-  freeCell(pos: GridPosition): boolean {
+  freeCell(pos: GridPosition): TacticalGrid | null {
     const cell = this.getCell(pos);
-    if (!cell) return false;
+    if (!cell) return null;
     
-    cell.occupiedBy = undefined;
-    return true;
+    // Créer nouvelle grille avec cellule libérée
+    const newGrid = this._deepClone();
+    const newCell = newGrid.getCell(pos);
+    if (newCell) {
+      newCell.occupiedBy = undefined;
+    }
+    return newGrid;
   }
 
   /**
-   * Déplacer une entité d'une position à une autre
+   * PHASE 1 - ACTION 1.3.2: Déplacer une entité (immutable)
+   * Retourne nouvelle instance selon Gemini #2
    */
-  moveEntity(entityId: string, from: GridPosition, to: GridPosition): boolean {
+  moveEntity(entityId: string, from: GridPosition, to: GridPosition): TacticalGrid | null {
     const fromCell = this.getCell(from);
     const toCell = this.getCell(to);
     
-    if (!fromCell || !toCell) return false;
-    if (fromCell.occupiedBy !== entityId) return false;
-    if (!this.isCellFree(to)) return false;
+    if (!fromCell || !toCell) return null;
+    if (fromCell.occupiedBy !== entityId) return null;
+    if (!this.isCellFree(to)) return null;
     
-    // Libérer l'ancienne position
-    fromCell.occupiedBy = undefined;
+    // Créer nouvelle grille avec entité déplacée
+    const newGrid = this._deepClone();
+    const newFromCell = newGrid.getCell(from);
+    const newToCell = newGrid.getCell(to);
     
-    // Occuper la nouvelle position
-    toCell.occupiedBy = entityId;
+    if (newFromCell && newToCell) {
+      newFromCell.occupiedBy = undefined;
+      newToCell.occupiedBy = entityId;
+    }
     
-    return true;
+    return newGrid;
+  }
+  
+  /**
+   * PHASE 1 - ACTION 1.3.2: Clone profond pour immutabilité
+   */
+  private _deepClone(): TacticalGrid {
+    const clonedGrid = new TacticalGrid(this._dimensions);
+    
+    // Cloner toutes les cellules
+     for (const [key, originalCell] of this._cells.entries())  {
+     const clonedCell: GridCell = {
+      ...originalCell,
+      occupiedBy:originalCell.occupiedBy};
+      clonedGrid._cells.set(key, clonedCell)
+    }
+    
+    return clonedGrid;
   }
 
   /**

@@ -34,25 +34,21 @@ export interface PositionalAdvantage {
 
 /**
  * AI DECISION MAKER - Domain Service
- * Service principal de prise de décision pour l'IA
+ * PHASE 3 - ACTION 3.2.1: Service stateless selon Gemini #3
  */
 export class AIDecisionMaker {
-  private readonly combat: Combat;
-  private readonly tacticalGrid: TacticalGrid;
-
-  constructor(combat: Combat) {
-    this.combat = combat;
-    this.tacticalGrid = combat.tacticalGrid;
-  }
-
+  
   /**
-   * Décider de l'action optimale pour une entité IA
+   * PHASE 3 - ACTION 3.2.1: Décider de l'action optimale - stateless
+   * @param combat - Instance de combat à analyser
+   * @param entityId - ID de l'entité IA
+   * @returns Décision d'action optimale
    */
-  decideAction(entityId: string): ActionDecision | null {
-    const entity = this.combat.entities.get(entityId);
+  decideAction(combat: Combat, entityId: string): ActionDecision | null {
+    const entity = combat.entities.get(entityId);
     if (!entity || entity.type === 'player') return null;
 
-    const context = this.buildContext(entity);
+    const context = this.buildContext(combat, entity);
     const behaviorPattern = this.getBehaviorPattern(entity);
 
     // 1. Évaluer toutes les intentions possibles
@@ -86,15 +82,15 @@ export class AIDecisionMaker {
   /**
    * Évaluer toutes les menaces pour une entité
    */
-  assessThreats(entityId: string): ThreatInfo[] {
-    const entity = this.combat.entities.get(entityId);
+  assessThreats(combat: Combat, entityId: string): ThreatInfo[] {
+    const entity = combat.entities.get(entityId);
     if (!entity) return [];
 
-    const enemies = Array.from(this.combat.entities.values())
+    const enemies = Array.from(combat.entities.values())
       .filter(e => this.isEnemyOf(entity, e) && !e.isDead);
 
     return enemies.map(enemy => {
-      const distance = this.tacticalGrid.calculateDistance(
+      const distance = combat.tacticalGrid.calculateDistance(
         { x: entity.position.x, y: entity.position.y },
         { x: enemy.position.x, y: enemy.position.y }
       );
@@ -116,39 +112,40 @@ export class AIDecisionMaker {
   /**
    * Évaluer les positions tactiques avantageuses
    */
-  evaluatePositions(entityId: string, maxRange: number = 3): PositionalAdvantage[] {
-    const entity = this.combat.entities.get(entityId);
+  evaluatePositions(combat: Combat, entityId: string, maxRange: number = 3): PositionalAdvantage[] {
+    const entity = combat.entities.get(entityId);
     if (!entity) return [];
 
     const currentPos = { x: entity.position.x, y: entity.position.y };
-    const possiblePositions = this.tacticalGrid.getPositionsInRadius(currentPos, maxRange);
+    const possiblePositions = combat.tacticalGrid.getPositionsInRadius(currentPos, maxRange);
 
     return possiblePositions
-      .filter(pos => this.tacticalGrid.isCellFree(pos))
-      .map(pos => this.evaluatePosition(pos, entity))
+      .filter(pos => combat.tacticalGrid.isCellFree(pos))
+      .map(pos => this.evaluatePosition(combat, pos, entity))
       .sort((a, b) => b.score - a.score);
   }
 
   // MÉTHODES PRIVÉES
 
-  private buildContext(entity: CombatEntity): BehaviorContext {
-    const allEntities = Array.from(this.combat.entities.values()).filter(e => !e.isDead);
+  private buildContext(combat: Combat, entity: CombatEntity): BehaviorContext {
+    const allEntities = Array.from(combat.entities.values()).filter(e => !e.isDead);
     const allies = allEntities.filter(e => this.isAllyOf(entity, e));
     const enemies = allEntities.filter(e => this.isEnemyOf(entity, e));
 
     const entityPos = { x: entity.position.x, y: entity.position.y };
     
     const distanceToNearestEnemy = enemies.length > 0 ? 
-      Math.min(...enemies.map(e => this.tacticalGrid.calculateDistance(entityPos, { x: e.position.x, y: e.position.y }))) : 
+      Math.min(...enemies.map(e => combat.tacticalGrid.calculateDistance(entityPos, { x: e.position.x, y: e.position.y }))) : 
       Infinity;
 
     const distanceToNearestAlly = allies.length > 0 ?
-      Math.min(...allies.map(e => this.tacticalGrid.calculateDistance(entityPos, { x: e.position.x, y: e.position.y }))) :
+      Math.min(...allies.map(e => combat.tacticalGrid.calculateDistance(entityPos, { x: e.position.x, y: e.position.y }))) :
       Infinity;
 
     const hpPercentage = entity.currentHP / entity.maxHP;
 
     return {
+      combat,
       entity,
       allEntities,
       allies,
@@ -158,7 +155,7 @@ export class AIDecisionMaker {
       hpPercentage,
       distanceToNearestEnemy,
       distanceToNearestAlly,
-      isInDanger: this.isEntityInDanger(entity, enemies),
+      isInDanger: this.isEntityInDanger(combat, entity, enemies),
       canReachEnemy: distanceToNearestEnemy <= entity.baseSpeed + 1,
       hasRangedOptions: this.hasRangedOptions(entity),
       hasSpells: entity.knownSpells.length > 0,
@@ -303,7 +300,7 @@ export class AIDecisionMaker {
 
       case 'cast_damage':
         const damageTarget = this.selectBestTarget(context);
-        const damageSpell = this.selectBestDamageSpell(entity);
+        const damageSpell = this.selectBestDamageSpell(context.combat, entity);
         return {
           ...decision,
           spell: damageSpell?.spell,
@@ -314,7 +311,7 @@ export class AIDecisionMaker {
 
       case 'cast_heal':
         const healTarget = this.selectBestHealTarget(context);
-        const healSpell = this.selectBestHealSpell(entity);
+        const healSpell = this.selectBestHealSpell(context.combat, entity);
         return {
           ...decision,
           spell: healSpell?.spell,
@@ -325,18 +322,18 @@ export class AIDecisionMaker {
 
       case 'move_closer':
         const moveTarget = this.selectBestTarget(context);
-        const movePos = this.findBestMovePosition(entity, moveTarget, 'closer');
+        const movePos = this.findBestMovePosition(context.combat, entity, moveTarget, 'closer');
         return {
           ...decision,
-          targetPosition: movePos,
+          targetPosition: movePos || undefined,
           reasoning: `Se rapprocher de ${moveTarget?.name || 'ennemi'}`
         };
 
       case 'move_away':
-        const fleePos = this.findBestMovePosition(entity, null, 'away');
+        const fleePos = this.findBestMovePosition(context.combat, entity, null, 'away');
         return {
           ...decision,
-          targetPosition: fleePos,
+          targetPosition: fleePos || undefined,
           reasoning: 'Fuir le danger'
         };
 
@@ -384,11 +381,11 @@ export class AIDecisionMaker {
     return entity2.type === 'player' || entity2.type === 'ally';
   }
 
-  private isEntityInDanger(entity: CombatEntity, enemies: CombatEntity[]): boolean {
+  private isEntityInDanger(combat: Combat, entity: CombatEntity, enemies: CombatEntity[]): boolean {
     const entityPos = { x: entity.position.x, y: entity.position.y };
     
     return enemies.some(enemy => {
-      const distance = this.tacticalGrid.calculateDistance(
+      const distance = combat.tacticalGrid.calculateDistance(
         entityPos, 
         { x: enemy.position.x, y: enemy.position.y }
       );
@@ -409,14 +406,14 @@ export class AIDecisionMaker {
 
     // Priorité : HP bas, proche, dangereux
     return context.enemies.reduce((best, current) => {
-      const bestScore = this.calculateTargetScore(best, context.entity);
-      const currentScore = this.calculateTargetScore(current, context.entity);
+      const bestScore = this.calculateTargetScore(context.combat, best, context.entity);
+      const currentScore = this.calculateTargetScore(context.combat, current, context.entity);
       return currentScore > bestScore ? current : best;
     });
   }
 
-  private calculateTargetScore(target: CombatEntity, attacker: CombatEntity): number {
-    const distance = this.tacticalGrid.calculateDistance(
+  private calculateTargetScore(combat: Combat, target: CombatEntity, attacker: CombatEntity): number {
+    const distance = combat.tacticalGrid.calculateDistance(
       { x: attacker.position.x, y: attacker.position.y },
       { x: target.position.x, y: target.position.y }
     );
@@ -435,8 +432,8 @@ export class AIDecisionMaker {
     return score;
   }
 
-  private selectBestDamageSpell(entity: CombatEntity): { spell: Spell; level: SpellLevel } | null {
-    const availableSpells = this.combat.getAvailableSpells(entity.id);
+  private selectBestDamageSpell(combat: Combat, entity: CombatEntity): { spell: Spell; level: SpellLevel } | null {
+    const availableSpells = combat.getAvailableSpells(entity.id);
     const damageSpells = availableSpells.filter(item => 
       item.spell.effects.damage && item.availableLevels.length > 0
     );
@@ -450,8 +447,8 @@ export class AIDecisionMaker {
     };
   }
 
-  private selectBestHealSpell(entity: CombatEntity): { spell: Spell; level: SpellLevel } | null {
-    const availableSpells = this.combat.getAvailableSpells(entity.id);
+  private selectBestHealSpell(combat: Combat, entity: CombatEntity): { spell: Spell; level: SpellLevel } | null {
+    const availableSpells = combat.getAvailableSpells(entity.id);
     const healSpells = availableSpells.filter(item => 
       item.spell.effects.healing && item.availableLevels.length > 0
     );
@@ -474,6 +471,7 @@ export class AIDecisionMaker {
   }
 
   private findBestMovePosition(
+    combat: Combat,
     entity: CombatEntity, 
     target: CombatEntity | null, 
     intent: 'closer' | 'away'
@@ -481,16 +479,16 @@ export class AIDecisionMaker {
     const currentPos = { x: entity.position.x, y: entity.position.y };
     const moveRange = Math.min(entity.actionsRemaining.movement, entity.baseSpeed);
     
-    const possiblePositions = this.tacticalGrid.getPositionsInRadius(currentPos, moveRange)
-      .filter(pos => this.tacticalGrid.isCellFree(pos));
+    const possiblePositions = combat.tacticalGrid.getPositionsInRadius(currentPos, moveRange)
+      .filter(pos => combat.tacticalGrid.isCellFree(pos));
 
     if (possiblePositions.length === 0) return null;
 
     if (!target) {
       // Mouvement défensif - chercher la position la plus sûre
       return possiblePositions.reduce((best, pos) => {
-        const bestScore = this.evaluatePosition(pos, entity).score;
-        const currentScore = this.evaluatePosition(pos, entity).score;
+        const bestScore = this.evaluatePosition(combat, best, entity).score;
+        const currentScore = this.evaluatePosition(combat, pos, entity).score;
         return currentScore > bestScore ? pos : best;
       });
     }
@@ -499,32 +497,32 @@ export class AIDecisionMaker {
 
     if (intent === 'closer') {
       return possiblePositions.reduce((best, pos) => {
-        const bestDistance = this.tacticalGrid.calculateDistance(best, targetPos);
-        const currentDistance = this.tacticalGrid.calculateDistance(pos, targetPos);
+        const bestDistance = combat.tacticalGrid.calculateDistance(best, targetPos);
+        const currentDistance = combat.tacticalGrid.calculateDistance(pos, targetPos);
         return currentDistance < bestDistance ? pos : best;
       });
     } else {
       return possiblePositions.reduce((best, pos) => {
-        const bestDistance = this.tacticalGrid.calculateDistance(best, targetPos);
-        const currentDistance = this.tacticalGrid.calculateDistance(pos, targetPos);
+        const bestDistance = combat.tacticalGrid.calculateDistance(best, targetPos);
+        const currentDistance = combat.tacticalGrid.calculateDistance(pos, targetPos);
         return currentDistance > bestDistance ? pos : best;
       });
     }
   }
 
-  private evaluatePosition(pos: GridPosition, entity: CombatEntity): PositionalAdvantage {
-    const enemies = Array.from(this.combat.entities.values())
+  private evaluatePosition(combat: Combat, pos: GridPosition, entity: CombatEntity): PositionalAdvantage {
+    const enemies = Array.from(combat.entities.values())
       .filter(e => this.isEnemyOf(entity, e) && !e.isDead);
     
-    const allies = Array.from(this.combat.entities.values())
+    const allies = Array.from(combat.entities.values())
       .filter(e => this.isAllyOf(entity, e) && !e.isDead);
 
     const distanceToEnemies = enemies.map(e => 
-      this.tacticalGrid.calculateDistance(pos, { x: e.position.x, y: e.position.y })
+      combat.tacticalGrid.calculateDistance(pos, { x: e.position.x, y: e.position.y })
     );
     
     const distanceToAllies = allies.map(e =>
-      this.tacticalGrid.calculateDistance(pos, { x: e.position.x, y: e.position.y })
+      combat.tacticalGrid.calculateDistance(pos, { x: e.position.x, y: e.position.y })
     );
 
     let score = 50; // Base

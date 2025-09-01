@@ -18,5 +18,4 @@ export { GameUI } from './components/GameUI';
 // Containers
 export { CombatContainer } from './containers/CombatContainer';
 
-// Types
-export type { CombatPhase, PlayerAction, CombatState, UseCombatResult } from './hooks/useCombat';
+// Types supprimés (nettoyage exports)

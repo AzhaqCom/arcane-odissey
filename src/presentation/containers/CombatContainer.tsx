@@ -34,18 +34,23 @@ export const CombatContainer: React.FC<CombatContainerProps> = ({
     logs,
     error,
     isLoading,
+    // PHASE 2 - Nouvelles données Domain centralisées
+    healthDisplays,
+    reachableCells,
+    spellValidations,
+    weaponData,
     // Méthodes exposées par le hook
-    initiateCombat,
-    advanceTurn,
     executeAITurn,
     moveEntity,
     performWeaponAttack,
-    performSpellCast,
-    // ... autres méthodes si nécessaires
+    castSpell,
+    advanceToNextEntity
   } = useCombat(scene.content as CombatSceneContent);
 
   // Récupération des autres services (pour les props du CombatPanel)
   const { weaponRepository, spellRepository } = useRepositories();
+  
+  // PHASE 2 - ACTION 2.2.3: Supprimé EquipmentService - tout via useCombat
 
   
   // Détecter fin de combat
@@ -77,12 +82,12 @@ export const CombatContainer: React.FC<CombatContainerProps> = ({
           break;
         case 'advance_turn':
           
-          const advanceResult = await advanceTurn();
+          await advanceToNextEntity();
           
           break;
         case 'execute_ai_turn':
           
-          const aiResult = await executeAITurn();
+          await executeAITurn();
           
           break;
         case 'move_entity':
@@ -96,14 +101,15 @@ export const CombatContainer: React.FC<CombatContainerProps> = ({
           break;
         case 'cast_spell':
           
-          await performSpellCast(action.casterId, action.spellId, action.targetId);
+          await castSpell(action.casterId, action.spellId, 1, action.targetId);
           break;
         default:
           
           logger.ui('Unknown combat action', { action });
       }
     } catch (error) {
-      console.error('❌ Error in handleCombatAction:', error);
+  
+      logger.error('❌ Error in handleCombatAction:', error);
       logger.ui('Error in combat action', { action, error });
     }
   };
@@ -143,34 +149,9 @@ export const CombatContainer: React.FC<CombatContainerProps> = ({
     
     
     
-    // Armes et sorts - récupérer depuis l'équipement du personnage (avec fallback temporaire)
-    const weapons = isPlayerTurn && gameSession.playerCharacter ? (() => {
-      const character = gameSession.playerCharacter;
-      
-      
-      
-      
-      
-      // TEMPORAIRE: Fallback vers l'ancien système si l'inventory n'existe pas
-      if (!character.inventory || !character.inventory.equipped) {
-        console.warn('⚠️ Using fallback weapons (dagger, shortbow) - inventory not found');
-        return weaponRepository.getWeaponsByIds(['dagger', 'shortbow']);
-      }
-      
-      const equippedWeaponIds: string[] = [];
-      
-      // Récupérer toutes les armes équipées (mainHand, offHand, rangedWeapon, etc.)
-      Object.values(character.inventory.equipped).forEach(itemId => {
-        // Vérifier si c'est une arme (en essayant de la récupérer du weaponRepository)
-        const weapons = weaponRepository.getWeaponsByIds([itemId]);
-        if (weapons.length > 0) {
-          equippedWeaponIds.push(itemId);
-        }
-      });
-      
-      
-      return weaponRepository.getWeaponsByIds(equippedWeaponIds);
-    })() : [];
+    // PHASE 2 - ACTION 2.2.3: Récupération armes via weaponData du hook
+    const weapons = isPlayerTurn && currentEntity ? 
+      (currentEntity.inventory?.weapons || []) : [];
     const spellIds = isPlayerTurn && gameSession.playerCharacter ? 
       [...new Set([...gameSession.playerCharacter.knownSpells, ...gameSession.playerCharacter.preparedSpells])] : [];
     const spells = spellIds.length > 0 ? spellRepository.getSpellsByIds(spellIds) : [];
@@ -185,6 +166,9 @@ export const CombatContainer: React.FC<CombatContainerProps> = ({
       targetingSpell: targetingSpell,
       weapons,
       spells,
+      // PHASE 2 - ACTION 2.2.2: Données pré-calculées depuis useCombat
+      spellValidations,
+      formattedDamages,
       onStartCombat: () => {
         
         handleCombatAction({ type: 'start_combat' });
@@ -270,6 +254,11 @@ export const CombatContainer: React.FC<CombatContainerProps> = ({
       isMovementMode={isMovementMode}
       isLoading={isLoading}
       
+      // PHASE 2 - Props Domain centralisées depuis useCombat
+      healthDisplays={healthDisplays}
+      reachableCells={reachableCells}
+      gridDimensions={combat.tacticalGrid.dimensions}
+      
       // Actions de grille
       onCellClick={(position) => {
         if (!combat) return;
@@ -296,14 +285,10 @@ export const CombatContainer: React.FC<CombatContainerProps> = ({
             const currentEntity = combat.getCurrentEntity();
             if (currentEntity) {
               if (targetingWeapon) {
-                // Check weapon range
-                const weapon = weaponRepository.getById(targetingWeapon);
+                // Déléguer validation de portée au Use Case
+                const weapon = weaponRepository.getWeapon(targetingWeapon);
                 if (weapon) {
-                  const distance = Math.abs(currentEntity.position.x - position.x) + 
-                                  Math.abs(currentEntity.position.y - position.y);
-                  const weaponRange = weapon.type === 'melee' ? 1 : (weapon.rangeNormal || weapon.range || 1);
-                  
-                  if (distance <= weaponRange) {
+                  if (combat.canAttackPosition(currentEntity.id, position, weapon.id)) {
                     
                     handleCombatAction({ 
                       type: 'attack_weapon', 

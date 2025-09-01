@@ -19,6 +19,20 @@ import type { Position, InventorySpec, AbilityScores, ActionsRemaining } from '.
 // Utiliser Position des types du domaine
 export type { Position } from '../types';
 
+export interface HealthDisplay {
+  readonly percentage: number;
+  readonly color: string;
+  readonly status: 'healthy' | 'wounded' | 'critical' | 'dead';
+  readonly displayText: string;
+}
+
+export interface SpellCastingValidation {
+  readonly canCast: boolean;
+  readonly hasSlot: boolean;
+  readonly hasAction: boolean;
+  readonly reason?: string;
+}
+
 export interface CombatEntity {
   readonly id: string;
   readonly name: string;
@@ -35,10 +49,10 @@ export interface CombatEntity {
   readonly abilities: EntityAbilities;
   readonly spellcastingAbility?: 'intelligence' | 'wisdom' | 'charisma';
   
-  // Mutable State
-  currentHP: number;
-  position: Position;
-  initiative: number;
+  // Mutable State - PHASE 1.2.2: Rendu immutable
+  readonly currentHP: number;
+  readonly position: Position;
+  readonly initiative: number;
   
   // Actions disponibles ce tour
   actionsRemaining: ActionsRemaining;
@@ -103,6 +117,185 @@ export class Combat {
     (this._aiService as any).getAIDecisionMaker = () => this._aiDecisionMaker;
     (this._aiService as any).getThreatAssessmentService = () => this._threatAssessment;
     (this._aiService as any).getActionPrioritizer = () => ActionPrioritizer;
+  }
+  
+  /**
+   * PHASE 1 - ACTION 1.1.1: Obtenir l'affichage de santé d'une entité
+   * Migré depuis CombatUIStateUseCase - Logique métier dans Domain
+   */
+  getEntityHealthDisplay(entityId: string): HealthDisplay {
+    const entity = this._entities.get(entityId);
+    if (!entity) {
+      throw new Error(`Entity ${entityId} not found in combat`);
+    }
+    
+    const percentage = Math.max(0, Math.min(100, (entity.currentHP / entity.maxHP) * 100));
+    
+    let color: string;
+    let status: 'healthy' | 'wounded' | 'critical' | 'dead';
+    
+    if (entity.isDead) {
+      color = '#808080';
+      status = 'dead';
+    } else if (percentage > 60) {
+      color = '#4CAF50';
+      status = 'healthy';
+    } else if (percentage > 30) {
+      color = '#FF9800';
+      status = 'wounded';
+    } else {
+      color = '#F44336';
+      status = 'critical';
+    }
+    
+    const displayText = `${entity.currentHP}/${entity.maxHP}`;
+    
+    return {
+      percentage,
+      color,
+      status,
+      displayText
+    };
+  }
+
+  /**
+   * PHASE 1 - ACTION 1.1.2: Obtenir les cellules atteignables pour une entité
+   * Migré depuis MovementUIUseCase - Logique métier dans Domain
+   */
+  getReachableCells(entityId: string): Position[] {
+    const entity = this._entities.get(entityId);
+    if (!entity) {
+      throw new Error(`Entity ${entityId} not found in combat`);
+    }
+    
+    const reachable: Position[] = [];
+    const movementRange = entity.actionsRemaining.movement || 0;
+    const dimensions = this._tacticalGrid.dimensions;
+
+    for (let x = 0; x < dimensions.width; x++) {
+      for (let y = 0; y < dimensions.height; y++) {
+        const targetPos = { x, y };
+        
+        // Utiliser TacticalCalculationService du Domain
+        const distance = this._calculateDistance(entity.position, targetPos);
+        const canMoveTo = this._tacticalGrid.isCellFree(targetPos);
+
+        if (distance <= movementRange && canMoveTo) {
+          reachable.push(targetPos);
+        }
+      }
+    }
+
+    return reachable;
+  }
+  
+  private _calculateDistance(from: Position, to: Position): number {
+    return Math.abs(from.x - to.x) + Math.abs(from.y - to.y);
+  }
+
+  /**
+   * PHASE 1 - ACTION 1.1.3: Valider si une entité peut lancer un sort
+   * Migré depuis SpellValidationUseCase - Logique métier dans Domain
+   */
+  canCastSpell(casterId: string, spellId: string): SpellCastingValidation {
+    const caster = this._entities.get(casterId);
+    if (!caster) {
+      throw new Error(`Caster ${casterId} not found in combat`);
+    }
+    
+    // Trouver le sort dans les sorts connus
+    const spell = caster.knownSpells.find(s => s.id === spellId);
+    if (!spell) {
+      return {
+        canCast: false,
+        hasSlot: false,
+        hasAction: false,
+        reason: `Sort ${spellId} non connu par ${caster.name}`
+      };
+    }
+    
+    // Vérifier les slots de sort disponibles
+    const hasSlot = caster.spellSlots.hasSlot(spell.level);
+    
+    // Déterminer le coût d'action requis
+    const actionCost = spell.castingTime === 'bonus_action' ? 'bonusAction' : 'action';
+    const actionValue = caster.actionsRemaining[actionCost as keyof typeof caster.actionsRemaining];
+    const hasAction = typeof actionValue === 'number' ? actionValue > 0 : Boolean(actionValue);
+    
+    // Validation globale
+    const canCast = hasSlot && hasAction;
+    
+    // Raison de l'échec si applicable
+    let reason: string | undefined;
+    if (!hasSlot) {
+      reason = `Aucun slot de niveau ${spell.level} disponible`;
+    } else if (!hasAction) {
+      reason = `Aucune ${actionCost === 'action' ? 'action' : 'action bonus'} disponible`;
+    }
+    
+    return {
+      canCast,
+      hasSlot,
+      hasAction,
+      reason
+    };
+  }
+
+  /**
+   * PHASE 1 - ACTION 1.1.4: Valider si une entité peut attaquer une position
+   * Migré depuis WeaponRangeUseCase - Logique métier dans Domain
+   */
+  canAttackPosition(attackerId: string, position: Position, weaponId: string): boolean {
+    const attacker = this._entities.get(attackerId);
+    if (!attacker) {
+      throw new Error(`Attacker ${attackerId} not found in combat`);
+    }
+    
+    // Trouver l'arme dans l'inventaire ou les armes équipées
+    const weapon = attacker.inventory?.weapons?.find(w => w.id === weaponId);
+    if (!weapon) {
+      throw new Error(`Weapon ${weaponId} not found for attacker ${attackerId}`);
+    }
+    
+    // Déléguer la détermination de portée à l'entité Weapon
+    const weaponRange = weapon.getAttackRange();
+    
+    // Calcul de distance et validation
+    const distance = this._calculateDistance(attacker.position, position);
+    
+    return distance <= weaponRange;
+  }
+  
+  /**
+   * PHASE 1 - ACTION 1.2.2: Méthodes helper pour CombatEntity immutable
+   * Pattern with...() pour respecter Gemini #1
+   */
+  private _createUpdatedEntity(entityId: string, updates: Partial<CombatEntity>): CombatEntity {
+    const current = this._entities.get(entityId);
+    if (!current) {
+      throw new Error(`Entity ${entityId} not found`);
+    }
+    return { ...current, ...updates };
+  }
+  
+  withEntityHP(entityId: string, newHP: number): Combat {
+    const updatedEntity = this._createUpdatedEntity(entityId, { currentHP: newHP });
+    const newEntities = new Map(this._entities);
+    newEntities.set(entityId, updatedEntity);
+    
+    const newCombat = Object.create(Object.getPrototypeOf(this));
+    Object.assign(newCombat, this, { _entities: newEntities });
+    return newCombat;
+  }
+  
+  withEntityPosition(entityId: string, newPosition: Position): Combat {
+    const updatedEntity = this._createUpdatedEntity(entityId, { position: newPosition });
+    const newEntities = new Map(this._entities);
+    newEntities.set(entityId, updatedEntity);
+    
+    const newCombat = Object.create(Object.getPrototypeOf(this));
+    Object.assign(newCombat, this, { _entities: newEntities });
+    return newCombat;
   }
 
   // GETTERS (Pure)

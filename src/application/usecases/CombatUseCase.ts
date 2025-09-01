@@ -9,6 +9,8 @@ import { type IWeaponRepository } from '../../infrastructure/repositories/Weapon
 import { GameNarrativeService } from '../../domain/services/GameNarrativeService';
 import { type NarrativeMessage } from '../../domain/entities/NarrativeMessage';
 import { EnemyMapper } from '../mappers/EnemyMapper';
+import { DiceRollingService } from '../../domain/services/DiceRollingService';
+import { InitiativeService } from '../../domain/services/InitiativeService';
 
 // On définit un type pour la "recette" d'ennemis venant de la scène
 export interface EnemyEncounter {
@@ -23,7 +25,7 @@ export class CombatUseCase {
   // Repositories pour futures implémentations
   // private readonly effectsRepo: IEffectsRepository;
   // private readonly weaponRepo: IWeaponRepository;
-  
+
   constructor(
     combatRepo: ICombatRepository,
     characterRepo: ICharacterRepository,
@@ -36,14 +38,14 @@ export class CombatUseCase {
   }
 
   async initiateCombat(
-    playerIds: string[], 
+    playerIds: string[],
     enemyEncounters: EnemyEncounter[],
     initialPositions: Record<string, Position>
   ): Promise<{ success: boolean; combat?: Combat; error?: string; narrativeMessages?: NarrativeMessage[] }> {
     try {
       let combat = new Combat(`combat_${Date.now()}`);
       const narrativeMessages: NarrativeMessage[] = [];
-      
+
       // Message de début de combat généré par le Domain
       narrativeMessages.push(GameNarrativeService.createCombatStartMessage());
 
@@ -51,19 +53,19 @@ export class CombatUseCase {
       for (const characterId of playerIds) {
         const character = await this.characterRepo.getById(characterId);
         if (!character) return { success: false, error: `Character ${characterId} not found` };
-        
+      
         const initiativeRoll = Math.floor(Math.random() * 20) + 1;
         const initiative = initiativeRoll + character.getAbilityModifiers().dexterity;
-        
+
         // Message d'initiative généré par le Domain
         narrativeMessages.push(
           GameNarrativeService.createInitiativeMessage(
-            character.name, 
-            initiativeRoll, 
+            character.name,
+            initiativeRoll,
             character.getAbilityModifiers().dexterity
           )
         );
-        
+
         const combatant = CombatantFactory.createFromCharacter(character, initiative, initialPositions[characterId]);
         combat = combat.withAddedEntity(combatant);
         combat.tacticalGrid.occupyCell(combatant.position, combatant.id);
@@ -91,15 +93,15 @@ export class CombatUseCase {
           // Conversion via mapper
           const mappedData = EnemyMapper.infraToEnemySpec(enemyDataSource, enemyTemplate);
 
-          const initiativeRoll = Math.floor(Math.random() * 20) + 1;
+          const initiativeRoll = DiceRollingService.rollD20();
           const dexModifier = 2; // TODO: récupérer le vrai modificateur de dextérité de l'ennemi
-          const initiative = initiativeRoll + dexModifier;
-          
+          const initiative = InitiativeService.calculateInitiativeWithModifier(dexModifier);
+
           // Message d'initiative ennemi généré par le Domain
           narrativeMessages.push(
             GameNarrativeService.createInitiativeMessage(
-              mappedData.enemySpec.name, 
-              initiativeRoll, 
+              mappedData.enemySpec.name,
+              initiativeRoll,
               dexModifier
             )
           );
@@ -115,7 +117,7 @@ export class CombatUseCase {
             initiative,
             position
           );
-          
+
           combat = combat.withAddedEntity(combatant);
           combat.tacticalGrid.occupyCell(combatant.position, combatant.id);
         }
@@ -139,7 +141,7 @@ export class CombatUseCase {
     try {
       return await this.combatRepo.getCombat();
     } catch (error) {
-      console.error('Failed to get current combat:', error);
+      logger.error('Failed to get current combat:', error);
       return null;
     }
   }
@@ -154,30 +156,30 @@ export class CombatUseCase {
         return { success: false, error: 'No active combat' };
       }
 
-     
+
 
       const result = combat.executeAITurn();
-      
-    
-      
+
+
+
       if (!result) {
-        
+
         return { success: false, error: 'No AI turn available (probably player turn)' };
       }
 
       if (!result.valid) {
-        
+
         return { success: false, error: `AI action invalid: ${result.reasons?.join(', ')}` };
       }
 
-      
+
 
       // Le résultat de l'IA ne contient plus newCombatState - utiliser combat directement
       const finalCombat = combat.withCheckedCombatEnd();
       await this.combatRepo.saveCombat(finalCombat);
       return { success: true, result, combat: finalCombat };
     } catch (error) {
-      console.error('🚨 AI Turn error:', error);
+      logger.error('🚨 AI Turn error:', error);
       return { success: false, error: (error as Error).message };
     }
   }
@@ -194,11 +196,11 @@ export class CombatUseCase {
     const newCombat = combat.withAdvancedTurn();
     const nextEntity = newCombat.getCurrentEntity();
     const combatResult = newCombat.withCheckedCombatEnd();
-    
+
     await this.combatRepo.saveCombat(newCombat);
 
-    return { 
-      success: true, 
+    return {
+      success: true,
       nextEntity: nextEntity || undefined,
       combatEnded: combatResult !== null,
       combat: newCombat
@@ -209,7 +211,7 @@ export class CombatUseCase {
    * Appliquer des dégâts à une entité
    */
   async applyDamage(
-    targetId: string, 
+    targetId: string,
     damage: number
   ): Promise<{ success: boolean; targetDied?: boolean; combat?: Combat }> {
     const combat = await this.combatRepo.getCombat();
@@ -233,7 +235,7 @@ export class CombatUseCase {
    * Soigner une entité
    */
   async healEntity(
-    targetId: string, 
+    targetId: string,
     healing: number
   ): Promise<{ success: boolean; combat?: Combat }> {
     const combat = await this.combatRepo.getCombat();
@@ -268,10 +270,10 @@ export class CombatUseCase {
     try {
       const newCombat = combat.withEntityMoved(entityId, newPosition, movementCost);
       await this.combatRepo.saveCombat(newCombat);
-      
+
       return { success: true, combat: newCombat };
     } catch (error) {
-      
+
       return { success: false, error: (error as Error).message };
     }
   }
@@ -285,7 +287,7 @@ export class CombatUseCase {
       return { success: false };
     }
 
-    
+
     return { success: true };
   }
 
@@ -304,7 +306,7 @@ export class CombatUseCase {
 
     const attacker = combat.entities.get(attackerId);
     const target = combat.entities.get(targetId);
-    
+
     if (!attacker || !target) {
       return { success: false, error: 'Attacker or target not found' };
     }
@@ -314,10 +316,10 @@ export class CombatUseCase {
     }
 
     // Calcul d'attaque simplifié pour l'instant
-    const attackRoll = Math.floor(Math.random() * 20) + 1;
+    const attackRoll = DiceRollingService.rollD20();
     const hit = attackRoll >= target.baseAC;
-    const damage = hit ? Math.floor(Math.random() * 6) + 1 : 0;
-    
+    const damage = hit ? DiceRollingService.rollD6() : 0;
+
     // Message d'attaque généré par le Domain
     const narrativeMessage = GameNarrativeService.createAttackMessage(
       attacker.name,
@@ -326,17 +328,17 @@ export class CombatUseCase {
       hit,
       hit ? damage : undefined
     );
-    
+
     try {
       let newCombat = combat;
-      
+
       if (hit) {
         newCombat = combat.withDamageApplied(targetId, damage);
       }
-      
+
       newCombat = newCombat.withActionConsumed(attackerId, 'action');
       await this.combatRepo.saveCombat(newCombat);
-      
+
       return { success: true, damage, combat: newCombat, narrativeMessage };
     } catch (error) {
       return { success: false, error: (error as Error).message };
@@ -358,7 +360,7 @@ export class CombatUseCase {
 
     const caster = combat.entities.get(casterId);
     const target = combat.entities.get(targetId);
-    
+
     if (!caster || !target) {
       return { success: false, error: 'Caster or target not found' };
     }
@@ -369,9 +371,9 @@ export class CombatUseCase {
 
     try {
       // Sort de dégâts simplifié
-      const damage = Math.floor(Math.random() * 6) + 1;
+      const damage = DiceRollingService.rollD6();
       const spellName = 'Trait de feu'; // TODO: récupérer le vrai nom du sort depuis spellId
-      
+
       // Message de sort généré par le Domain
       const narrativeMessage = GameNarrativeService.createSpellMessage(
         caster.name,
@@ -379,12 +381,12 @@ export class CombatUseCase {
         target.name,
         damage
       );
-      
+
       let newCombat = combat.withDamageApplied(targetId, damage);
       newCombat = newCombat.withActionConsumed(casterId, 'action');
-      
+
       await this.combatRepo.saveCombat(newCombat);
-      
+
       return { success: true, damage, combat: newCombat, narrativeMessage };
     } catch (error) {
       return { success: false, error: (error as Error).message };

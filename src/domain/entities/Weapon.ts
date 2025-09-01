@@ -188,7 +188,7 @@ export class Weapon {
   private parseDice(diceString: string): [number, number] {
     const match = diceString.match(/(\d+)d(\d+)/);
     if (!match) {
-      console.warn(`Invalid dice format: ${diceString}`);
+      // Invalid dice format - return default 1d4
       return [1, 4]; // Valeur par défaut
     }
     

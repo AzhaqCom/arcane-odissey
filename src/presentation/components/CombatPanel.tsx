@@ -4,15 +4,17 @@
  */
 
 import React from 'react';
-import { type CombatEntity } from '../../domain/entities/Combat';
+import { type CombatEntity, Combat } from '../../domain/entities/Combat';
 import { type Weapon } from '../../domain/entities/Weapon';
 import { type Spell } from '../../domain/entities/Spell';
+import type { SpellCastingValidation } from '../../domain/entities/Combat';
 
 import type { UICombatPhase } from '../../types/combat';
 
 type CombatPhase = UICombatPhase;
 
 interface CombatPanelProps {
+  // PHASE 2 - ACTION 2.2.2: Props pures - Presentation 100% stupide
   phase: CombatPhase;
   currentEntity: CombatEntity | null;
   isPlayerTurn: boolean;
@@ -22,6 +24,9 @@ interface CombatPanelProps {
   targetingSpell?: string | null;   // spellId when targeting for spell
   weapons: Weapon[];
   spells: Spell[];
+  // Données pré-calculées depuis useCombat
+  spellValidations: Map<string, any>;
+  formattedDamages: Map<string, string>;
   onStartCombat: () => void;
   onAdvanceTurn: () => void;
   onExecuteAITurn: () => void;
@@ -41,6 +46,8 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
   targetingSpell = null,
   weapons,
   spells,
+  spellValidations,
+  formattedDamages,
   onStartCombat,
   onAdvanceTurn,
   onExecuteAITurn,
@@ -188,15 +195,14 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
         <div style={{ marginBottom: '20px' }}>
           <h4 style={{ marginBottom: '10px', color: '#555' }}>✨ Sorts</h4>
           {spells.map(spell => {
-            const canCast = currentEntity.spellSlots.hasSlot(spell.level);
-            const actionCost = spell.castingTime === 'bonus_action' ? 'bonusAction' : 'action';
-            const hasAction = currentEntity.actionsRemaining[actionCost as keyof typeof currentEntity.actionsRemaining];
+            // PHASE 2 - ACTION 2.2.2: Utiliser validation depuis props
+            const validation = spellValidations.get(spell.id);
             
             return (
               <button
                 key={spell.id}
                 onClick={() => onCastSpell(spell.id)}
-                disabled={isLoading || !canCast || !hasAction}
+                disabled={isLoading || !validation.canCast}
                 style={{
                   width: '100%',
                   padding: '10px',
@@ -215,9 +221,7 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
                     <div><strong>{spell.name}</strong></div>
                     {spell.effects.damage && (
                       <div style={{ fontSize: '12px', opacity: 0.9 }}>
-                        Dégâts: {spell.effects.damage[0]?.diceCount}d{spell.effects.damage[0]?.diceType}
-                        {spell.effects.damage[0]?.modifier ? `+${spell.effects.damage[0].modifier}` : ''}
-                        {spell.combatProperties.projectiles && ` (${spell.combatProperties.projectiles} projectiles)`}
+                        Dégâts: {formattedDamages.get(spell.id) || 'N/A'}
                       </div>
                     )}
                   </div>

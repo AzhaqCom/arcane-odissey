@@ -308,32 +308,43 @@ export class SpellSlots {
   }
 
   /**
-   * Utiliser un emplacement de sort
+   * PHASE 1 - ACTION 1.3.1: Utiliser un emplacement de sort (immutable)
+   * Retourne nouvelle instance selon Gemini #2
    */
-  useSlot(level: SpellLevel): boolean {
-    if (!this.hasSlot(level)) return false;
+  useSlot(level: SpellLevel): SpellSlots | null {
+    if (!this.hasSlot(level)) return null;
 
-    this._usedSlots[level]++;
-    return true;
+    const newUsedSlots = { ...this._usedSlots };
+    newUsedSlots[level]++;
+    
+    const newSpellSlots = new SpellSlots(this._slots);
+    (newSpellSlots as any)._usedSlots = newUsedSlots;
+    return newSpellSlots;
   }
 
   /**
-   * Récupérer tous les emplacements (repos long)
+   * PHASE 1 - ACTION 1.3.1: Récupérer tous les emplacements (immutable)
+   * Retourne nouvelle instance selon Gemini #2
    */
-  recoverAllSlots(): void {
-    (Object.keys(this._usedSlots) as unknown as SpellLevel[]).forEach(level => {
-      this._usedSlots[level] = 0;
-    });
+  recoverAllSlots(): SpellSlots {
+    const newSpellSlots = new SpellSlots(this._slots);
+    return newSpellSlots; // Constructor initialise déjà _usedSlots à 0
   }
 
   /**
-   * Récupérer certains emplacements (repos court pour certaines classes)
+   * PHASE 1 - ACTION 1.3.1: Récupérer certains emplacements (immutable)
+   * Retourne nouvelle instance selon Gemini #2
    */
-  recoverSlots(slotsToRecover: Partial<Record<SpellLevel, number>>): void {
+  recoverSlots(slotsToRecover: Partial<Record<SpellLevel, number>>): SpellSlots {
+    const newUsedSlots = { ...this._usedSlots };
     (Object.keys(slotsToRecover) as unknown as SpellLevel[]).forEach(level => {
       const toRecover = slotsToRecover[level] || 0;
-      this._usedSlots[level] = Math.max(0, this._usedSlots[level] - toRecover);
+      newUsedSlots[level] = Math.max(0, newUsedSlots[level] - toRecover);
     });
+    
+    const newSpellSlots = new SpellSlots(this._slots);
+    (newSpellSlots as any)._usedSlots = newUsedSlots;
+    return newSpellSlots;
   }
 
   /**

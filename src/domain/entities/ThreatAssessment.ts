@@ -56,30 +56,23 @@ export interface DefensiveAssessment {
  * Analyse complète des menaces pour prise de décision tactique
  */
 export class ThreatAssessment {
-  private readonly combat: Combat;
-  private readonly tacticalGrid: TacticalGrid;
-
-  constructor(combat: Combat) {
-    this.combat = combat;
-    this.tacticalGrid = combat.tacticalGrid;
-  }
 
   /**
    * Analyser toutes les menaces pour une entité
    */
-  analyzeThreat(entityId: string, targetId: string): ThreatAnalysis {
-    const entity = this.combat.entities.get(entityId);
-    const target = this.combat.entities.get(targetId);
+  analyzeThreat(combat: Combat, entityId: string, targetId: string): ThreatAnalysis {
+    const entity = combat.entities.get(entityId);
+    const target = combat.entities.get(targetId);
     
     if (!entity || !target) {
       return this.createEmptyThreatAnalysis(targetId);
     }
 
-    const components = this.assessThreatComponents(entity, target);
+    const components = this.assessThreatComponents(combat, entity, target);
     const overallThreat = this.calculateOverallThreat(components);
-    const immediateThreat = this.calculateImmediateThreat(entity, target, components);
-    const potentialThreat = this.calculatePotentialThreat(entity, target, components);
-    const recommendations = this.generateThreatRecommendations(entity, target, components);
+    const immediateThreat = this.calculateImmediateThreat(combat, entity, target, components);
+    const potentialThreat = this.calculatePotentialThreat(combat, entity, target, components);
+    const recommendations = this.generateThreatRecommendations(combat, entity, target, components);
 
     return {
       entityId: targetId,
@@ -95,14 +88,14 @@ export class ThreatAssessment {
   /**
    * Évaluer les menaces dans une zone
    */
-  assessAreaThreats(centerPos: GridPosition, radius: number, perspective: CombatEntity): AreaThreat[] {
-    const positions = this.tacticalGrid.getPositionsInRadius(centerPos, radius);
-    const enemies = Array.from(this.combat.entities.values())
+  assessAreaThreats(combat: Combat, centerPos: GridPosition, radius: number, perspective: CombatEntity): AreaThreat[] {
+    const positions = combat.tacticalGrid.getPositionsInRadius(centerPos, radius);
+    const enemies = Array.from(combat.entities.values())
       .filter(e => this.isEnemyOf(perspective, e) && !e.isDead);
 
     return positions.map(pos => {
       const threats = enemies.map(enemy => {
-        const distance = this.tacticalGrid.calculateDistance(
+        const distance = combat.tacticalGrid.calculateDistance(
           pos,
           { x: enemy.position.x, y: enemy.position.y }
         );
@@ -132,26 +125,26 @@ export class ThreatAssessment {
   /**
    * Évaluer les défenses d'une entité
    */
-  assessDefenses(entityId: string): DefensiveAssessment {
-    const entity = this.combat.entities.get(entityId);
+  assessDefenses(combat: Combat, entityId: string): DefensiveAssessment {
+    const entity = combat.entities.get(entityId);
     if (!entity) {
       return this.createEmptyDefensiveAssessment(entityId);
     }
 
-    const enemies = Array.from(this.combat.entities.values())
+    const enemies = Array.from(combat.entities.values())
       .filter(e => this.isEnemyOf(entity, e) && !e.isDead);
 
     const currentDefenses = {
       ac: entity.baseAC,
       hp: entity.currentHP,
       hpPercentage: entity.currentHP / entity.maxHP,
-      cover: this.assessCoverLevel(entity, enemies),
+      cover: this.assessCoverLevel(combat, entity, enemies),
       conditions: [...entity.conditions]
     };
 
-    const weaknesses = this.identifyWeaknesses(entity, enemies);
-    const strengths = this.identifyStrengths(entity, enemies);
-    const vulnerability = this.calculateVulnerability(entity, enemies, currentDefenses);
+    const weaknesses = this.identifyWeaknesses(combat, entity, enemies);
+    const strengths = this.identifyStrengths(combat, entity, enemies);
+    const vulnerability = this.calculateVulnerability(combat, entity, enemies, currentDefenses);
     const survivalChance = this.calculateSurvivalChance(entity, enemies, vulnerability);
 
     return {
@@ -167,16 +160,16 @@ export class ThreatAssessment {
   /**
    * Identifier les cibles prioritaires
    */
-  identifyPriorityTargets(attackerId: string): Array<{ entityId: string; priority: number; reasoning: string[] }> {
-    const attacker = this.combat.entities.get(attackerId);
+  identifyPriorityTargets(combat: Combat, attackerId: string): Array<{ entityId: string; priority: number; reasoning: string[] }> {
+    const attacker = combat.entities.get(attackerId);
     if (!attacker) return [];
 
-    const enemies = Array.from(this.combat.entities.values())
+    const enemies = Array.from(combat.entities.values())
       .filter(e => this.isEnemyOf(attacker, e) && !e.isDead);
 
     return enemies.map(enemy => {
-      const priority = this.calculateTargetPriority(attacker, enemy);
-      const reasoning = this.explainTargetPriority(attacker, enemy);
+      const priority = this.calculateTargetPriority(combat, attacker, enemy);
+      const reasoning = this.explainTargetPriority(combat, attacker, enemy);
 
       return {
         entityId: enemy.id,
@@ -188,33 +181,33 @@ export class ThreatAssessment {
 
   // MÉTHODES PRIVÉES
 
-  private assessThreatComponents(threat: CombatEntity, target: CombatEntity): ThreatComponent[] {
+  private assessThreatComponents(combat: Combat, threat: CombatEntity, target: CombatEntity): ThreatComponent[] {
     const components: ThreatComponent[] = [];
 
     // Composant dégâts
-    const damageComponent = this.assessDamageComponent(threat, target);
+    const damageComponent = this.assessDamageComponent(combat, threat, target);
     components.push(damageComponent);
 
     // Composant position
-    const positionComponent = this.assessPositionComponent(threat, target);
+    const positionComponent = this.assessPositionComponent(combat, threat, target);
     components.push(positionComponent);
 
     // Composant capacités
-    const abilitiesComponent = this.assessAbilitiesComponent(threat, target);
+    const abilitiesComponent = this.assessAbilitiesComponent(combat, threat, target);
     components.push(abilitiesComponent);
 
     // Composant ressources
-    const resourcesComponent = this.assessResourcesComponent(threat, target);
+    const resourcesComponent = this.assessResourcesComponent(combat, threat, target);
     components.push(resourcesComponent);
 
     // Composant soutien
-    const supportComponent = this.assessSupportComponent(threat, target);
+    const supportComponent = this.assessSupportComponent(combat, threat, target);
     components.push(supportComponent);
 
     return components;
   }
 
-  private assessDamageComponent(threat: CombatEntity, target: CombatEntity): ThreatComponent {
+  private assessDamageComponent(combat: Combat, threat: CombatEntity, target: CombatEntity): ThreatComponent {
     let damageScore = 0;
 
     // Évaluer dégâts potentiels des actions
@@ -246,8 +239,8 @@ export class ThreatAssessment {
     };
   }
 
-  private assessPositionComponent(threat: CombatEntity, target: CombatEntity): ThreatComponent {
-    const distance = this.tacticalGrid.calculateDistance(
+  private assessPositionComponent(combat: Combat, threat: CombatEntity, target: CombatEntity): ThreatComponent {
+    const distance = combat.tacticalGrid.calculateDistance(
       { x: threat.position.x, y: threat.position.y },
       { x: target.position.x, y: target.position.y }
     );
@@ -260,7 +253,7 @@ export class ThreatAssessment {
     else if (distance <= 5) positionScore += 10;
 
     // Vérifier ligne de vue
-    if (this.tacticalGrid.hasLineOfSight(
+    if (combat.tacticalGrid.hasLineOfSight(
       { x: threat.position.x, y: threat.position.y },
       { x: target.position.x, y: target.position.y }
     )) {
@@ -268,7 +261,7 @@ export class ThreatAssessment {
     }
 
     // Flanquement ou avantage tactique
-    if (this.hasFlankingAdvantage(threat, target)) {
+    if (this.hasFlankingAdvantage(combat, threat, target)) {
       positionScore += 25;
     }
 
@@ -332,15 +325,15 @@ export class ThreatAssessment {
     };
   }
 
-  private assessSupportComponent(threat: CombatEntity, target: CombatEntity): ThreatComponent {
+  private assessSupportComponent(combat: Combat, threat: CombatEntity, target: CombatEntity): ThreatComponent {
     let supportScore = 0;
 
     // Alliés à proximité qui peuvent aider
-    const allies = Array.from(this.combat.entities.values())
+    const allies = Array.from(combat.entities.values())
       .filter(e => this.isAllyOf(threat, e) && !e.isDead);
 
     const nearbyAllies = allies.filter(ally => {
-      const distance = this.tacticalGrid.calculateDistance(
+      const distance = combat.tacticalGrid.calculateDistance(
         { x: threat.position.x, y: threat.position.y },
         { x: ally.position.x, y: ally.position.y }
       );
@@ -351,7 +344,7 @@ export class ThreatAssessment {
 
     // Bonus si des alliés peuvent flanquer
     const flankingAllies = nearbyAllies.filter(ally => 
-      this.couldFlankWith(threat, ally, target)
+      this.couldFlankWith(combat, threat, ally, target)
     );
     supportScore += flankingAllies.length * 10;
 
@@ -369,11 +362,11 @@ export class ThreatAssessment {
     );
   }
 
-  private calculateImmediateThreat(threat: CombatEntity, target: CombatEntity, components: ThreatComponent[]): number {
+  private calculateImmediateThreat(combat: Combat, threat: CombatEntity, target: CombatEntity, components: ThreatComponent[]): number {
     const baseScore = this.calculateOverallThreat(components);
     
     // Facteur de distance pour menace immédiate
-    const distance = this.tacticalGrid.calculateDistance(
+    const distance = combat.tacticalGrid.calculateDistance(
       { x: threat.position.x, y: threat.position.y },
       { x: target.position.x, y: target.position.y }
     );
@@ -386,7 +379,7 @@ export class ThreatAssessment {
     return Math.min(100, baseScore * immediateFactor);
   }
 
-  private calculatePotentialThreat(threat: CombatEntity, target: CombatEntity, components: ThreatComponent[]): number {
+  private calculatePotentialThreat(combat: Combat, threat: CombatEntity, target: CombatEntity, components: ThreatComponent[]): number {
     const baseScore = this.calculateOverallThreat(components);
     
     // Facteur de mobilité et ressources
@@ -399,7 +392,7 @@ export class ThreatAssessment {
     return Math.min(100, baseScore * potentialFactor);
   }
 
-  private generateThreatRecommendations(threat: CombatEntity, target: CombatEntity, components: ThreatComponent[]): string[] {
+  private generateThreatRecommendations(combat: Combat, threat: CombatEntity, target: CombatEntity, components: ThreatComponent[]): string[] {
     const recommendations: string[] = [];
 
     const damageComponent = components.find(c => c.type === 'damage');
@@ -413,7 +406,7 @@ export class ThreatAssessment {
       recommendations.push('Position tactique avantageuse - considérer repositionnement');
     }
 
-    const distance = this.tacticalGrid.calculateDistance(
+    const distance = combat.tacticalGrid.calculateDistance(
       { x: threat.position.x, y: threat.position.y },
       { x: target.position.x, y: target.position.y }
     );
@@ -484,30 +477,30 @@ export class ThreatAssessment {
     return this.getAbilityModifier(entity, entity.spellcastingAbility);
   }
 
-  private assessCoverLevel(entity: CombatEntity, enemies: CombatEntity[]): 'none' | 'half' | 'three_quarters' | 'full' {
+  private assessCoverLevel(combat: Combat, entity: CombatEntity, enemies: CombatEntity[]): 'none' | 'half' | 'three_quarters' | 'full' {
     // Vérifier la couverture contre l'ennemi le plus proche
     if (enemies.length === 0) return 'none';
 
     const entityPos = { x: entity.position.x, y: entity.position.y };
     const closestEnemy = enemies.reduce((closest, enemy) => {
-      const distance = this.tacticalGrid.calculateDistance(
+      const distance = combat.tacticalGrid.calculateDistance(
         entityPos, 
         { x: enemy.position.x, y: enemy.position.y }
       );
-      const closestDistance = this.tacticalGrid.calculateDistance(
+      const closestDistance = combat.tacticalGrid.calculateDistance(
         entityPos,
         { x: closest.position.x, y: closest.position.y }
       );
       return distance < closestDistance ? enemy : closest;
     });
 
-    return this.tacticalGrid.calculateCover(
+    return combat.tacticalGrid.calculateCover(
       entityPos,
       { x: closestEnemy.position.x, y: closestEnemy.position.y }
     );
   }
 
-  private identifyWeaknesses(entity: CombatEntity, enemies: CombatEntity[]): string[] {
+  private identifyWeaknesses(combat: Combat, entity: CombatEntity, enemies: CombatEntity[]): string[] {
     const weaknesses: string[] = [];
 
     if (entity.currentHP < entity.maxHP * 0.3) {
@@ -523,7 +516,7 @@ export class ThreatAssessment {
     }
 
     const surrounded = enemies.filter(enemy => {
-      const distance = this.tacticalGrid.calculateDistance(
+      const distance = combat.tacticalGrid.calculateDistance(
         { x: entity.position.x, y: entity.position.y },
         { x: enemy.position.x, y: enemy.position.y }
       );
@@ -537,7 +530,7 @@ export class ThreatAssessment {
     return weaknesses;
   }
 
-  private identifyStrengths(entity: CombatEntity, enemies: CombatEntity[]): string[] {
+  private identifyStrengths(combat: Combat, entity: CombatEntity, enemies: CombatEntity[]): string[] {
     const strengths: string[] = [];
 
     if (entity.currentHP > entity.maxHP * 0.8) {
@@ -556,7 +549,7 @@ export class ThreatAssessment {
     return strengths;
   }
 
-  private calculateVulnerability(entity: CombatEntity, enemies: CombatEntity[], defenses: any): number {
+  private calculateVulnerability(combat: Combat, entity: CombatEntity, enemies: CombatEntity[], defenses: any): number {
     let vulnerability = 50; // Base
 
     // HP bas augmente vulnérabilité
@@ -564,7 +557,7 @@ export class ThreatAssessment {
 
     // Nombre d'ennemis proches
     const nearbyEnemies = enemies.filter(enemy => {
-      const distance = this.tacticalGrid.calculateDistance(
+      const distance = combat.tacticalGrid.calculateDistance(
         { x: entity.position.x, y: entity.position.y },
         { x: enemy.position.x, y: enemy.position.y }
       );
@@ -587,14 +580,14 @@ export class ThreatAssessment {
     return Math.max(0, 100 - vulnerability);
   }
 
-  private calculateTargetPriority(attacker: CombatEntity, target: CombatEntity): number {
+  private calculateTargetPriority(combat: Combat, attacker: CombatEntity, target: CombatEntity): number {
     let priority = 50;
 
     // HP bas = priorité haute (plus facile à tuer)
     priority += (1 - (target.currentHP / target.maxHP)) * 30;
 
     // Distance - plus proche = plus prioritaire
-    const distance = this.tacticalGrid.calculateDistance(
+    const distance = combat.tacticalGrid.calculateDistance(
       { x: attacker.position.x, y: attacker.position.y },
       { x: target.position.x, y: target.position.y }
     );
@@ -607,14 +600,14 @@ export class ThreatAssessment {
     return Math.max(0, Math.min(100, priority));
   }
 
-  private explainTargetPriority(attacker: CombatEntity, target: CombatEntity): string[] {
+  private explainTargetPriority(combat: Combat, attacker: CombatEntity, target: CombatEntity): string[] {
     const reasons: string[] = [];
 
     const hpPercentage = target.currentHP / target.maxHP;
     if (hpPercentage < 0.3) reasons.push('Gravement blessé');
     else if (hpPercentage < 0.6) reasons.push('Blessé');
 
-    const distance = this.tacticalGrid.calculateDistance(
+    const distance = combat.tacticalGrid.calculateDistance(
       { x: attacker.position.x, y: attacker.position.y },
       { x: target.position.x, y: target.position.y }
     );
@@ -648,9 +641,9 @@ export class ThreatAssessment {
     return `${enemy.name} distant`;
   }
 
-  private hasFlankingAdvantage(attacker: CombatEntity, target: CombatEntity): boolean {
+  private hasFlankingAdvantage(combat: Combat, attacker: CombatEntity, target: CombatEntity): boolean {
     // Implémentation simplifiée - vérifie s'il y a un allié de l'autre côté
-    const allies = Array.from(this.combat.entities.values())
+    const allies = Array.from(combat.entities.values())
       .filter(e => this.isAllyOf(attacker, e) && !e.isDead);
 
     const attackerPos = { x: attacker.position.x, y: attacker.position.y };
@@ -658,7 +651,7 @@ export class ThreatAssessment {
 
     return allies.some(ally => {
       const allyPos = { x: ally.position.x, y: ally.position.y };
-      const allyDistance = this.tacticalGrid.calculateDistance(allyPos, targetPos);
+      const allyDistance = combat.tacticalGrid.calculateDistance(allyPos, targetPos);
       
       // L'allié doit être adjacent à la cible
       if (allyDistance > 1) return false;
@@ -674,13 +667,13 @@ export class ThreatAssessment {
     });
   }
 
-  private couldFlankWith(entity1: CombatEntity, entity2: CombatEntity, target: CombatEntity): boolean {
+  private couldFlankWith(combat: Combat, entity1: CombatEntity, entity2: CombatEntity, target: CombatEntity): boolean {
     const pos1 = { x: entity1.position.x, y: entity1.position.y };
     const pos2 = { x: entity2.position.x, y: entity2.position.y };
     const targetPos = { x: target.position.x, y: target.position.y };
 
-    const distance1 = this.tacticalGrid.calculateDistance(pos1, targetPos);
-    const distance2 = this.tacticalGrid.calculateDistance(pos2, targetPos);
+    const distance1 = combat.tacticalGrid.calculateDistance(pos1, targetPos);
+    const distance2 = combat.tacticalGrid.calculateDistance(pos2, targetPos);
 
     // Les deux doivent pouvoir atteindre la cible
     if (distance1 > entity1.baseSpeed + 1 || distance2 > entity2.baseSpeed + 1) {

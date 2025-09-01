@@ -177,7 +177,7 @@ export class GameUseCase {
 
       if (result.success && result.newScene) {
         // Mettre à jour la session
-        this.currentSession.navigateToScene(targetSceneId);
+        this.currentSession = this.currentSession.withNewScene(targetSceneId);
 
         // Appliquer les effets
         for (const effect of result.appliedEffects) {

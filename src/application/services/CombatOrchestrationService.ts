@@ -8,6 +8,8 @@
 import { Combat, type CombatEntity } from '../../domain/entities/Combat';
 import type { Position } from '../../domain/types';
 import type { Spell, SpellLevel } from '../../domain/entities/Spell';
+import { AbilityCalculationService } from '../../domain/services/AbilityCalculationService';
+import { DamageCalculationService } from '../../domain/services/DamageCalculationService';
 
 // Types de résultats pour l'orchestration
 export interface CombatActionResult {
@@ -399,8 +401,8 @@ export class CombatOrchestrationService {
    * Calculer le bonus d'attaque pour une arme donnée
    */
   private calculateAttackBonus(attacker: CombatEntity, _weaponId: string): number {
-    // Logique simplifiée - En réalité, cela dépendrait de l'arme et des stats
-    const strengthMod = Math.floor((attacker.abilities.strength - 10) / 2);
+    // Utiliser le service Domain pour calcul du modificateur
+    const strengthMod = AbilityCalculationService.calculateModifier(attacker.abilities.strength);
     return strengthMod + attacker.proficiencyBonus;
   }
 
@@ -408,10 +410,15 @@ export class CombatOrchestrationService {
    * Rouler les dégâts d'une arme
    */
   private rollWeaponDamage(_weaponId: string, attacker: CombatEntity): number {
-    // Logique simplifiée - 1d6 + modificateur de Force
-    const weaponDie = Math.floor(Math.random() * 6) + 1;
-    const strengthMod = Math.floor((attacker.abilities.strength - 10) / 2);
-    return Math.max(1, weaponDie + strengthMod);
+    // Créer une arme temporaire pour le calcul (logique simplifiée)
+    const tempWeapon = {
+      damage: { diceCount: 1, diceType: 6 },
+      category: 'melee' as const,
+      properties: [] as string[]
+    };
+    
+    // Utiliser le service Domain pour calcul des dégâts
+    return DamageCalculationService.calculateWeaponDamage(tempWeapon, attacker);
   }
 
   /**

@@ -3,7 +3,7 @@
  * Pure business logic pour IA comportementale D&D 5E
  */
 
-import { type CombatEntity } from './Combat';
+import { type CombatEntity, type Combat } from './Combat';
 import { type Action } from './Action';
 import { type Spell, type SpellLevel } from './Spell';
 import { type GridPosition } from './TacticalGrid';
@@ -18,6 +18,7 @@ export type ActionIntent =
   | 'dash' | 'dodge' | 'hide' | 'help' | 'ready_action';
 
 export interface BehaviorContext {
+  readonly combat: Combat;
   readonly entity: CombatEntity;
   readonly allEntities: CombatEntity[];
   readonly allies: CombatEntity[];

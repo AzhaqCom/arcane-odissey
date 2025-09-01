@@ -12,6 +12,7 @@ import type { Combat } from '../../domain/entities/Combat';
 import type { Position } from '../../domain/entities/Combat';
 import type { EnemyEncounter } from '../../application/usecases/CombatUseCase';
 import type { CombatSceneContent } from '../../infrastructure/data/types/SceneData';
+import { EncounterMapper } from '../../application/mappers/EncounterMapper';
 import type { LogEntry } from '../components/GameLog';
 import type { CombatUseCase } from '../../application/usecases/CombatUseCase';
 import type { SpellLevel } from '../../domain/entities/Spell';
@@ -27,6 +28,77 @@ export const useCombat = (sceneContent: CombatSceneContent) => {
   const combatUseCase: CombatUseCase = DIContainer.getInstance().get('CombatUseCase');
   const orchestrationService = useMemo(() => new CombatOrchestrationService(), []);
 
+  // PHASE 2 - ACTION 2.1.1: Getters Domain dans useCombat
+  // Centraliser TOUS les accès Domain pour Presentation stupide
+  const healthDisplays = useMemo(() => {
+    if (!combat) return new Map();
+    
+    const displays = new Map();
+    Array.from(combat.entities.values()).forEach(entity => {
+      displays.set(entity.id, combat.getEntityHealthDisplay(entity.id));
+    });
+    return displays;
+  }, [combat]);
+
+  const reachableCells = useMemo(() => {
+    if (!combat) return new Set<string>();
+    
+    const currentEntity = combat.getCurrentEntity();
+    if (!currentEntity) return new Set<string>();
+    
+    const positions = combat.getReachableCells(currentEntity.id);
+    return new Set(positions.map(pos => `${pos.x},${pos.y}`));
+  }, [combat]);
+
+  // PHASE 2 - ACTION 2.1.2: Helpers formatage dans useCombat
+  // Centraliser validations et formatages pour Presentation stupide
+  const spellValidations = useMemo(() => {
+    if (!combat) return new Map();
+    
+    const currentEntity = combat.getCurrentEntity();
+    if (!currentEntity) return new Map();
+    
+    const validations = new Map();
+    currentEntity.knownSpells.forEach(spell => {
+      validations.set(spell.id, combat.canCastSpell(currentEntity.id, spell.id));
+    });
+    return validations;
+  }, [combat]);
+
+  const weaponData = useMemo(() => {
+    if (!combat) return new Map();
+    
+    const currentEntity = combat.getCurrentEntity();
+    if (!currentEntity) return new Map();
+    
+    const data = new Map();
+    currentEntity.inventory?.weapons?.forEach(weapon => {
+      data.set(weapon.id, {
+        canAttack: (targetPos: Position) => combat.canAttackPosition(currentEntity.id, targetPos, weapon.id),
+        range: weapon.getAttackRange()
+      });
+    });
+    return data;
+  }, [combat]);
+
+  // PHASE 2 - ACTION 2.1.2 (suite): Formatage dégâts sorts
+  const formattedDamages = useMemo(() => {
+    if (!combat) return new Map();
+    
+    const currentEntity = combat.getCurrentEntity();
+    if (!currentEntity) return new Map();
+    
+    const damages = new Map();
+    currentEntity.knownSpells.forEach(spell => {
+      if (spell.effects.damage) {
+        const { diceCount, diceType, bonus } = spell.effects.damage;
+        const formatted = `${diceCount}d${diceType}${bonus > 0 ? `+${bonus}` : bonus < 0 ? bonus : ''}`;
+        damages.set(spell.id, formatted);
+      }
+    });
+    return damages;
+  }, [combat]);
+
   // Initialisation via le CombatUseCase (conserver la logique existante d'initialisation)
   useEffect(() => {
     const initializeCombat = async () => {
@@ -34,22 +106,10 @@ export const useCombat = (sceneContent: CombatSceneContent) => {
       try {
         const playerIds = ['Elarion']; // IDs des joueurs actifs
         
-        const enemyEncounters: EnemyEncounter[] = sceneContent.enemies.map(enemyDef => {
-          const positions: Position[] = [enemyDef.position];
-          if (enemyDef.alternativePositions) {
-            positions.push(...enemyDef.alternativePositions);
-          }
-          return {
-            templateId: enemyDef.templateId,
-            count: enemyDef.count || 1,
-            positions: positions
-          };
-        });
-
-        const initialPositions: Record<string, Position> = {
-          'Elarion': sceneContent.combat?.playerStartPosition || { x: 2, y: 6 }
-        };
-
+        // Déléguer transformation données au Mapper Application
+        const enemyEncounters = EncounterMapper.sceneContentToEnemyEncounters(sceneContent);
+        const initialPositions = EncounterMapper.getPlayerInitialPositions(sceneContent);
+        
         // Utiliser le CombatUseCase existant pour l'initialisation
         const result = await combatUseCase.initiateCombat(
           playerIds,
@@ -61,7 +121,7 @@ export const useCombat = (sceneContent: CombatSceneContent) => {
           setCombat(result.combat);
           addLog('success', `Combat initialisé avec ${result.combat.entities.size} entités`);
         } else {
-          throw new Error(result.error || 'Erreur lors de l\'initialisation du combat');
+          throw new Error(result.error || 'Erreur lors de l\'initialisation du combat'); 
         }
         
       } catch (err) {
@@ -192,7 +252,7 @@ export const useCombat = (sceneContent: CombatSceneContent) => {
                `Tour IA ${aiResult.valid ? 'exécuté' : 'échoué'}${aiResult.damage ? ` (${aiResult.damage} dégâts)` : ''}${aiResult.healing ? ` (${aiResult.healing} soins)` : ''}`);
         
         // Forcer la mise à jour de l'état
-        setCombat(combat => combat ? { ...combat } : null);
+        setCombat(prevCombat => prevCombat ? { ...prevCombat } : null);
       }
       
       return aiResult;
@@ -272,6 +332,13 @@ export const useCombat = (sceneContent: CombatSceneContent) => {
     currentEntity,
     isCombatEnded,
     combatStatus,
+    
+    // PHASE 2 - Données Domain centralisées (Action 2.1.1-2.1.2)
+    healthDisplays,
+    reachableCells,
+    spellValidations,
+    weaponData,
+    formattedDamages,
     
     // Actions d'orchestration - TOUTES déléguées au service
     performWeaponAttack,

@@ -204,12 +204,12 @@ export class EffectsManager {
    * Faire avancer le temps pour tous les effets
    */
   advanceTime(minutes: number): string[] {
-    const expiredEffects: string[] = [];
+    let expiredEffects: string[] = [];
 
     this._activeEffects.forEach(effect => {
       effect.advanceTime(minutes);
       if (effect.isExpired) {
-        expiredEffects.push(effect.id);
+        expiredEffects = [...expiredEffects, effect.id];
       }
     });
 

@@ -8,6 +8,7 @@ import { GameSession, Character } from '../../domain/entities';
 import type { GameAction, GameStateSnapshot } from '../../application/usecases/GameUseCase';
 import { TimeDisplay } from './TimeDisplay';
 import { logger } from '../../infrastructure/services/Logger';
+import { UIStateUseCase } from '../../application/usecases/UIStateUseCase';
 
 interface GameUIProps {
   gameState: GameStateSnapshot;
@@ -81,17 +82,8 @@ export const GameUI: React.FC<GameUIProps> = ({
     }
   };
 
-  const getHealthPercentage = () => {
-    return Math.max(0, Math.min(100, (player.currentHP / player.maxHP) * 100));
-  };
-
-  const getHealthColor = () => {
-    const percentage = getHealthPercentage();
-    if (percentage > 75) return '#4ade80'; // vert
-    if (percentage > 50) return '#fbbf24'; // jaune
-    if (percentage > 25) return '#fb923c'; // orange
-    return '#ef4444'; // rouge
-  };
+  // Utiliser le Use Case pour les données d'affichage santé
+  const healthDisplayData = UIStateUseCase.getHealthDisplayData(player);
 
   return (
     <div className="game-ui">
@@ -114,8 +106,8 @@ export const GameUI: React.FC<GameUIProps> = ({
               <div 
                 className="health-bar-fill"
                 style={{ 
-                  width: `${getHealthPercentage()}%`,
-                  backgroundColor: getHealthColor(),
+                  width: `${healthDisplayData.percentage}%`,
+                  backgroundColor: healthDisplayData.color,
                   height:'3px'
                 }}
               />

@@ -4,55 +4,38 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { Combat, type CombatEntity, type Position } from '../../domain/entities/Combat';
+import { type CombatEntity, type Position } from '../../domain/entities/Combat';
+import type { HealthDisplay } from '../../domain/entities/Combat';
 
 interface CombatGridProps {
-  combat: Combat;
+  // PHASE 2 - ACTION 2.2.1: Props pures depuis useCombat
   entities: CombatEntity[];
+  healthDisplays: Map<string, HealthDisplay>;
+  reachableCells: Set<string>;
   isMovementMode: boolean;
   onCellClick: (position: Position) => void;
   onMovementCancel: () => void;
+  // Dimensions pour rendu grille
+  gridDimensions: { width: number; height: number };
 }
 
 export const CombatGrid: React.FC<CombatGridProps> = ({
-  combat,
   entities,
+  healthDisplays,
+  reachableCells,
   isMovementMode,
+  gridDimensions,
   onCellClick,
   onMovementCancel
 }) => {
-  const grid = combat.tacticalGrid;
-  const dimensions = grid.dimensions;
-  const currentEntity = combat.getCurrentEntity();
-
-  // Créer une map des entités par position
+  // PHASE 2 - ACTION 2.2.1: Composant 100% stupide - props pures uniquement
+  
+  // Créer une map des entités par position (pure rendering logic)
   const entitiesByPosition = new Map<string, CombatEntity>();
   entities.forEach(entity => {
     const key = `${entity.position.x},${entity.position.y}`;
     entitiesByPosition.set(key, entity);
   });
-
-  // Calculer les cellules de mouvement possibles
-  const reachableCells = useMemo(() => {
-    if (!isMovementMode || !currentEntity) return new Set<string>();
-
-    const reachable = new Set<string>();
-    const movementRange = currentEntity.actionsRemaining.movement || 0;
-
-    for (let x = 0; x < dimensions.width; x++) {
-      for (let y = 0; y < dimensions.height; y++) {
-        const targetPos = { x, y };
-        const distance = grid.calculateDistance(currentEntity.position, targetPos);
-        const canMoveTo = grid.isCellFree(targetPos);
-
-        if (distance <= movementRange && canMoveTo) {
-          reachable.add(`${x},${y}`);
-        }
-      }
-    }
-
-    return reachable;
-  }, [isMovementMode, currentEntity, dimensions, grid]);
 
   const getCellContent = (x: number, y: number): React.ReactNode => {
     const key = `${x},${y}`;
@@ -60,9 +43,8 @@ export const CombatGrid: React.FC<CombatGridProps> = ({
     const isReachable = reachableCells.has(key);
 
     if (entity) {
-      // Calculer le pourcentage et couleur HP
-      const hpPercentage = (entity.currentHP / entity.maxHP) * 100;
-      const hpColor = hpPercentage > 60 ? '#4CAF50' : hpPercentage > 30 ? '#FF9800' : '#F44336';
+      // PHASE 2 - ACTION 2.2.1: Utiliser healthDisplay depuis props
+      const healthDisplay = healthDisplays.get(entity.id);
       
       return (
         <div className="grid-entity-card">
@@ -71,12 +53,12 @@ export const CombatGrid: React.FC<CombatGridProps> = ({
             <div 
               className="entity-hp-fill"
               style={{ 
-                width: `${hpPercentage}%`,
-                backgroundColor: hpColor // ← Seul CSS inline pour dégradé
+                width: `${healthDisplay.percentage}%`,
+                backgroundColor: healthDisplay.color
               }} 
             />
           </div>
-          <div className="entity-hp-text">{entity.currentHP}/{entity.maxHP}</div>
+          <div className="entity-hp-text">{healthDisplay.displayText}</div>
         </div>
       );
     }
@@ -160,7 +142,7 @@ export const CombatGrid: React.FC<CombatGridProps> = ({
     // rows.push(headerRow);
 
     // Grille avec coordonnées Y
-    for (let y = 0; y < dimensions.height; y++) {
+    for (let y = 0; y < gridDimensions.height; y++) {
       const row = (
         <div key={y} style={{ flex:1,display: 'flex' }}>
           {/* Coordonnée Y */}
@@ -168,7 +150,7 @@ export const CombatGrid: React.FC<CombatGridProps> = ({
             {y}
           </div> */}
           {/* Cellules */}
-          {Array.from({ length: dimensions.width }, (_, x) => (
+          {Array.from({ length: gridDimensions.width }, (_, x) => (
             <div
               key={x}
               style={getCellStyle(x, y)}
