@@ -11,6 +11,7 @@ import { type NarrativeMessage } from '../../domain/entities/NarrativeMessage';
 import { EnemyMapper } from '../mappers/EnemyMapper';
 import { DiceRollingService } from '../../domain/services/DiceRollingService';
 import { InitiativeService } from '../../domain/services/InitiativeService';
+import { DIContainer } from '../../infrastructure/container/DIContainer';
 
 // On définit un type pour la "recette" d'ennemis venant de la scène
 export interface EnemyEncounter {
@@ -22,6 +23,7 @@ export interface EnemyEncounter {
 export class CombatUseCase {
   private readonly combatRepo: ICombatRepository;
   private readonly characterRepo: ICharacterRepository;
+  private readonly combatFactory: (id: string) => Combat;
   // Repositories pour futures implémentations
   // private readonly effectsRepo: IEffectsRepository;
   // private readonly weaponRepo: IWeaponRepository;
@@ -29,11 +31,14 @@ export class CombatUseCase {
   constructor(
     combatRepo: ICombatRepository,
     characterRepo: ICharacterRepository,
+    gameNarrativeService: GameNarrativeService,
+    combatFactory: (id: string) => Combat,
     _effectsRepo: IEffectsRepository,
     _weaponRepo: IWeaponRepository
   ) {
     this.combatRepo = combatRepo;
     this.characterRepo = characterRepo;
+    this.combatFactory = combatFactory;
     // effectsRepo et weaponRepo seront utilisés dans futures implémentations
   }
 
@@ -43,7 +48,7 @@ export class CombatUseCase {
     initialPositions: Record<string, Position>
   ): Promise<{ success: boolean; combat?: Combat; error?: string; narrativeMessages?: NarrativeMessage[] }> {
     try {
-      let combat = new Combat(`combat_${Date.now()}`);
+      let combat = this.combatFactory(`combat_${Date.now()}`);
       const narrativeMessages: NarrativeMessage[] = [];
 
       // Message de début de combat généré par le Domain
@@ -53,13 +58,13 @@ export class CombatUseCase {
       for (const characterId of playerIds) {
         const character = await this.characterRepo.getById(characterId);
         if (!character) return { success: false, error: `Character ${characterId} not found` };
-      
+
         const initiativeRoll = Math.floor(Math.random() * 20) + 1;
         const initiative = initiativeRoll + character.getAbilityModifiers().dexterity;
 
         // Message d'initiative généré par le Domain
         narrativeMessages.push(
-          GameNarrativeService.createInitiativeMessage(
+          this.gameNarrativeService.createInitiativeMessage(
             character.name,
             initiativeRoll,
             character.getAbilityModifiers().dexterity
@@ -99,7 +104,7 @@ export class CombatUseCase {
 
           // Message d'initiative ennemi généré par le Domain
           narrativeMessages.push(
-            GameNarrativeService.createInitiativeMessage(
+            this.gameNarrativeService.createInitiativeMessage(
               mappedData.enemySpec.name,
               initiativeRoll,
               dexModifier
@@ -257,25 +262,14 @@ export class CombatUseCase {
    */
   async moveEntity(
     entityId: string,
-    newPosition: Position,
-    movementCost: number = 1
+    newPosition: Position
   ): Promise<{ success: boolean; error?: string; combat?: Combat }> {
     const combat = await this.combatRepo.getCombat();
-    if (!combat) {
-      return { success: false, error: 'No active combat' };
-    }
+    if (!combat) return { success: false, error: 'No active combat' };
 
-
-
-    try {
-      const newCombat = combat.withEntityMoved(entityId, newPosition, movementCost);
-      await this.combatRepo.saveCombat(newCombat);
-
-      return { success: true, combat: newCombat };
-    } catch (error) {
-
-      return { success: false, error: (error as Error).message };
-    }
+    const result = combat.executeMovement(entityId, newPosition);
+    await this.combatRepo.saveCombat(result.newCombat);
+    return { success: result.success, combat: result.newCombat, error: result.success ? undefined : result.message };
   }
 
   /**
@@ -296,100 +290,31 @@ export class CombatUseCase {
    */
   async performWeaponAttack(
     attackerId: string,
-    _weaponId: string,
+    weaponId: string,
     targetId: string
   ): Promise<{ success: boolean; damage?: number; error?: string; combat?: Combat; narrativeMessage?: NarrativeMessage }> {
     const combat = await this.combatRepo.getCombat();
-    if (!combat) {
-      return { success: false, error: 'No active combat' };
-    }
+    if (!combat) return { success: false, error: 'No active combat' };
 
-    const attacker = combat.entities.get(attackerId);
-    const target = combat.entities.get(targetId);
-
-    if (!attacker || !target) {
-      return { success: false, error: 'Attacker or target not found' };
-    }
-
-    if (!attacker.actionsRemaining.action) {
-      return { success: false, error: 'No action remaining' };
-    }
-
-    // Calcul d'attaque simplifié pour l'instant
-    const attackRoll = DiceRollingService.rollD20();
-    const hit = attackRoll >= target.baseAC;
-    const damage = hit ? DiceRollingService.rollD6() : 0;
-
-    // Message d'attaque généré par le Domain
-    const narrativeMessage = GameNarrativeService.createAttackMessage(
-      attacker.name,
-      target.name,
-      'Épée', // TODO: récupérer le vrai nom de l'arme depuis weaponId
-      hit,
-      hit ? damage : undefined
-    );
-
-    try {
-      let newCombat = combat;
-
-      if (hit) {
-        newCombat = combat.withDamageApplied(targetId, damage);
-      }
-
-      newCombat = newCombat.withActionConsumed(attackerId, 'action');
-      await this.combatRepo.saveCombat(newCombat);
-
-      return { success: true, damage, combat: newCombat, narrativeMessage };
-    } catch (error) {
-      return { success: false, error: (error as Error).message };
-    }
+    const result = combat.performWeaponAttack(attackerId, weaponId, targetId);
+    await this.combatRepo.saveCombat(result.newCombat);
+    return { success: result.success, damage: result.damage, combat: result.newCombat, error: result.success ? undefined : result.message };
   }
 
   /**
    * Lancer un sort
    */
-  async performSpellCast(
+  async castSpell(
     casterId: string,
-    _spellId: string,
-    targetId: string
+    spellId: string,
+    level: SpellLevel,
+    targetId?: string
   ): Promise<{ success: boolean; damage?: number; error?: string; combat?: Combat; narrativeMessage?: NarrativeMessage }> {
     const combat = await this.combatRepo.getCombat();
-    if (!combat) {
-      return { success: false, error: 'No active combat' };
-    }
+    if (!combat) return { success: false, error: 'No active combat' };
 
-    const caster = combat.entities.get(casterId);
-    const target = combat.entities.get(targetId);
-
-    if (!caster || !target) {
-      return { success: false, error: 'Caster or target not found' };
-    }
-
-    if (!caster.actionsRemaining.action) {
-      return { success: false, error: 'No action remaining' };
-    }
-
-    try {
-      // Sort de dégâts simplifié
-      const damage = DiceRollingService.rollD6();
-      const spellName = 'Trait de feu'; // TODO: récupérer le vrai nom du sort depuis spellId
-
-      // Message de sort généré par le Domain
-      const narrativeMessage = GameNarrativeService.createSpellMessage(
-        caster.name,
-        spellName,
-        target.name,
-        damage
-      );
-
-      let newCombat = combat.withDamageApplied(targetId, damage);
-      newCombat = newCombat.withActionConsumed(casterId, 'action');
-
-      await this.combatRepo.saveCombat(newCombat);
-
-      return { success: true, damage, combat: newCombat, narrativeMessage };
-    } catch (error) {
-      return { success: false, error: (error as Error).message };
-    }
+    const result = combat.castSpell(casterId, spellId, level, targetId);
+    await this.combatRepo.saveCombat(result.newCombat);
+    return { success: result.success, damage: result.damage, combat: result.newCombat, error: result.success ? undefined : result.message };
   }
 }

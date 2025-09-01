@@ -35,7 +35,7 @@ export class NarrativeMessage {
       throw new Error('Message content cannot be empty');
     }
     
-    this._id = `${type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    this._id = crypto.randomUUID();
     this._type = type;
     this._content = content.trim();
     this._timestamp = new Date();

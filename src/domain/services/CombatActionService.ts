@@ -10,6 +10,7 @@ import type { GridPosition } from '../entities/TacticalGrid';
 import type { Action, ActionCost } from '../entities/Action';
 import type { Spell, SpellLevel } from '../entities/Spell';
 import type { EntityResources } from '../entities/ActionValidator';
+import type { DiceRollingService } from './DiceRollingService';
 
 export interface ActionExecutionResult {
   readonly success: boolean;
@@ -31,6 +32,8 @@ export interface SpellCastingResult {
  * Toutes les méthodes retournent un nouvel objet Combat (immutabilité)
  */
 export class CombatActionService {
+
+  constructor(private readonly diceRollingService: DiceRollingService) {}
 
   /**
    * Exécuter une action de combat
@@ -351,12 +354,12 @@ export class CombatActionService {
     const abilityModifier = this.getAbilityModifier(caster, 'strength'); // TODO: dynamique selon l'action
 
     if (action.effects.damage && target) {
-      totalDamage = action.calculateDamage(abilityModifier, caster.proficiencyBonus);
+      totalDamage = action.calculateDamage(this.diceRollingService, abilityModifier, caster.proficiencyBonus);
       newCombat = this.withDamageApplied(newCombat, target.id, totalDamage);
     }
 
     if (action.effects.healing && target) {
-      totalHealing = action.calculateHealing(abilityModifier);
+      totalHealing = action.calculateHealing(this.diceRollingService, abilityModifier);
       newCombat = this.withHealingApplied(newCombat, target.id, totalHealing);
     }
 
@@ -391,13 +394,13 @@ export class CombatActionService {
 
       for (const entity of affectedEntities) {
         if (spell.effects.damage) {
-          const damage = spell.calculateDamage(castAtLevel, spellcastingModifier, caster.proficiencyBonus);
+          const damage = spell.calculateDamage(this.diceRollingService, castAtLevel, spellcastingModifier, caster.proficiencyBonus);
           newCombat = this.withDamageApplied(newCombat, entity.id, damage);
           totalDamage += damage;
         }
         
         if (spell.effects.healing) {
-          const healing = spell.calculateHealing(castAtLevel, spellcastingModifier);
+          const healing = spell.calculateHealing(this.diceRollingService, castAtLevel, spellcastingModifier);
           newCombat = this.withHealingApplied(newCombat, entity.id, healing);
           totalHealing += healing;
         }
@@ -405,12 +408,12 @@ export class CombatActionService {
     } else if (target) {
       // Sort ciblé
       if (spell.effects.damage) {
-        totalDamage = spell.calculateDamage(castAtLevel, spellcastingModifier, caster.proficiencyBonus);
+        totalDamage = spell.calculateDamage(this.diceRollingService, castAtLevel, spellcastingModifier, caster.proficiencyBonus);
         newCombat = this.withDamageApplied(newCombat, target.id, totalDamage);
       }
 
       if (spell.effects.healing) {
-        totalHealing = spell.calculateHealing(castAtLevel, spellcastingModifier);
+        totalHealing = spell.calculateHealing(this.diceRollingService, castAtLevel, spellcastingModifier);
         newCombat = this.withHealingApplied(newCombat, target.id, totalHealing);
       }
     }

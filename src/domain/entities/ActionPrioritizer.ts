@@ -7,6 +7,7 @@ import { type CombatEntity } from './Combat';
 import { type Action } from './Action';
 import { type Spell, type SpellLevel } from './Spell';
 import { type BehaviorContext } from './BehaviorSystem';
+import type { DiceRollingService } from '../services/DiceRollingService';
 // import { type ActionDecision } from './BehaviorSystem'; // Non utilisé actuellement
 
 export interface PriorizedAction {
@@ -38,10 +39,12 @@ export type PriorityCriteria =
  */
 export class ActionPrioritizer {
 
+  constructor(private readonly diceRollingService: DiceRollingService) {}
+
   /**
    * Prioriser toutes les actions disponibles pour une entité
    */
-  static prioritizeActions(
+  prioritizeActions(
     entity: CombatEntity,
     context: BehaviorContext,
     criteria: PriorityCriteria[] = ['maximize_damage', 'minimize_risk']
@@ -283,12 +286,12 @@ export class ActionPrioritizer {
     
     let expectedDamage = 0;
     if (action.effects.damage && target) {
-      expectedDamage = action.calculateDamage(abilityModifier, entity.proficiencyBonus);
+      expectedDamage = action.calculateDamage(this.diceRollingService, abilityModifier, entity.proficiencyBonus);
     }
 
     let expectedHealing = 0;
     if (action.effects.healing && target) {
-      expectedHealing = action.calculateHealing(abilityModifier);
+      expectedHealing = action.calculateHealing(this.diceRollingService, abilityModifier);
     }
 
     const tacticalAdvantage = this.calculateTacticalAdvantage(action, entity, target, context);
@@ -315,12 +318,12 @@ export class ActionPrioritizer {
 
     let expectedDamage = 0;
     if (spell.effects.damage && target) {
-      expectedDamage = spell.calculateDamage(level, spellcastingModifier, entity.proficiencyBonus);
+      expectedDamage = spell.calculateDamage(this.diceRollingService, level, spellcastingModifier, entity.proficiencyBonus);
     }
 
     let expectedHealing = 0;
     if (spell.effects.healing && target) {
-      expectedHealing = spell.calculateHealing(level, spellcastingModifier);
+      expectedHealing = spell.calculateHealing(this.diceRollingService, level, spellcastingModifier);
     }
 
     const tacticalAdvantage = this.calculateSpellTacticalAdvantage(spell, level, entity, target, context);

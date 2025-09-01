@@ -7,7 +7,6 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { DIContainer } from '../../infrastructure/container/DIContainer';
-import { CombatOrchestrationService } from '../../application/services/CombatOrchestrationService';
 import type { Combat } from '../../domain/entities/Combat';
 import type { Position } from '../../domain/entities/Combat';
 import type { EnemyEncounter } from '../../application/usecases/CombatUseCase';
@@ -26,7 +25,6 @@ export const useCombat = (sceneContent: CombatSceneContent) => {
 
   // Services injectés - Pattern Dependency Injection
   const combatUseCase: CombatUseCase = DIContainer.getInstance().get('CombatUseCase');
-  const orchestrationService = useMemo(() => new CombatOrchestrationService(), []);
 
   // PHASE 2 - ACTION 2.1.1: Getters Domain dans useCombat
   // Centraliser TOUS les accès Domain pour Presentation stupide
@@ -145,13 +143,13 @@ export const useCombat = (sceneContent: CombatSceneContent) => {
     if (!combat) return;
     
     try {
-      const result = orchestrationService.performWeaponAttack(combat, attackerId, weaponId, targetId);
+      const result = await combatUseCase.performWeaponAttack(attackerId, weaponId, targetId);
       
       // Mise à jour de l'état React
-      setCombat(result.newCombat);
+      if (result.combat) setCombat(result.combat);
       
       // Log de l'action
-      addLog(result.success ? 'success' : 'error', result.message);
+      addLog(result.success ? 'success' : 'error', result.error || 'Action réussie');
       
       return result;
     } catch (err) {
@@ -159,7 +157,7 @@ export const useCombat = (sceneContent: CombatSceneContent) => {
       addLog('error', errorMessage);
       setError(errorMessage);
     }
-  }, [combat, orchestrationService]);
+  }, [combatUseCase]);
 
   /**
    * Lancer un sort - DÉLÉGATION PURE  
@@ -168,13 +166,13 @@ export const useCombat = (sceneContent: CombatSceneContent) => {
     if (!combat) return;
     
     try {
-      const result = orchestrationService.castSpellAction(combat, casterId, spellId, level, targetId);
+      const result = await combatUseCase.castSpell(casterId, spellId, level, targetId);
       
       // Mise à jour de l'état React
-      setCombat(result.newCombat);
+      if (result.combat) setCombat(result.combat);
       
       // Log de l'action
-      addLog(result.success ? 'success' : 'error', result.message);
+      addLog(result.success ? 'success' : 'error', result.error || 'Sort lancé');
       
       return result;
     } catch (err) {
@@ -182,7 +180,7 @@ export const useCombat = (sceneContent: CombatSceneContent) => {
       addLog('error', errorMessage);
       setError(errorMessage);
     }
-  }, [combat, orchestrationService]);
+  }, [combatUseCase]);
 
   /**
    * Déplacer une entité - DÉLÉGATION PURE
@@ -191,10 +189,10 @@ export const useCombat = (sceneContent: CombatSceneContent) => {
     if (!combat) return;
     
     try {
-      const result = orchestrationService.executeMovement(combat, entityId, newPosition);
+      const result = await combatUseCase.moveEntity(entityId, newPosition);
       
       // Mise à jour de l'état React
-      setCombat(result.newCombat);
+      if (result.combat) setCombat(result.combat);
       
       // Log de l'action
       addLog(result.success ? 'info' : 'error', result.message);
@@ -210,7 +208,7 @@ export const useCombat = (sceneContent: CombatSceneContent) => {
       addLog('error', errorMessage);
       setError(errorMessage);
     }
-  }, [combat, orchestrationService]);
+  }, [combatUseCase]);
 
   /**
    * Avancer au tour suivant - DÉLÉGATION PURE

@@ -14,6 +14,11 @@ import { CombatQueryService } from '../services/CombatQueryService';
 import { CombatStateService } from '../services/CombatStateService';
 import { CombatActionService } from '../services/CombatActionService';
 import { CombatAIService } from '../services/CombatAIService';
+import type { DiceRollingService } from '../services/DiceRollingService';
+import type { DamageCalculationService } from '../services/DamageCalculationService';
+import type { AbilityCalculationService } from '../services/AbilityCalculationService';
+import type { InitiativeService } from '../services/InitiativeService';
+import type { TacticalCalculationService } from '../services/TacticalCalculationService';
 import type { Position, InventorySpec, AbilityScores, ActionsRemaining } from '../types';
 
 // Utiliser Position des types du domaine
@@ -31,6 +36,28 @@ export interface SpellCastingValidation {
   readonly hasSlot: boolean;
   readonly hasAction: boolean;
   readonly reason?: string;
+}
+
+export interface CombatDependencies {
+  readonly diceRollingService: DiceRollingService;
+  readonly damageCalculationService: DamageCalculationService;
+  readonly abilityCalculationService: AbilityCalculationService;
+  readonly initiativeService: InitiativeService;
+  readonly tacticalCalculationService: TacticalCalculationService;
+  readonly actionPrioritizer: ActionPrioritizer;
+  readonly threatAssessment: ThreatAssessment;
+  readonly combatActionService: CombatActionService;
+}
+
+export interface CombatResult {
+  readonly newCombat: Combat;
+  readonly success: boolean;
+  readonly message: string;
+  readonly attackRoll?: number;
+  readonly damage?: number;
+  readonly healing?: number;
+  readonly spellLevel?: SpellLevel;
+  readonly opportunityAttacks?: string[];
 }
 
 export interface CombatEntity {
@@ -96,7 +123,11 @@ export class Combat {
   private readonly _actionService: CombatActionService;
   private readonly _aiService: CombatAIService;
 
-  constructor(id: string, gridDimensions: GridDimensions = { width: 12, height: 8 }) {
+  constructor(
+    id: string, 
+    gridDimensions: GridDimensions = { width: 12, height: 8 },
+    private readonly dependencies: CombatDependencies
+  ) {
     this._id = id;
     this._tacticalGrid = new TacticalGrid(gridDimensions);
     this._aiDecisionMaker = new AIDecisionMaker(this);
@@ -106,17 +137,18 @@ export class Combat {
     this._queryService = new CombatQueryService();
     this._stateService = new CombatStateService();
     this._actionService = new CombatActionService();
-    this._aiService = new CombatAIService();
     
     // Injection des dépendances entre services
     (this._actionService as any).getStateService = () => this._stateService;
     
-    // Injection des dépendances pour AIService
-    (this._aiService as any).getQueryService = () => this._queryService;
-    (this._aiService as any).getActionService = () => this._actionService;
-    (this._aiService as any).getAIDecisionMaker = () => this._aiDecisionMaker;
-    (this._aiService as any).getThreatAssessmentService = () => this._threatAssessment;
-    (this._aiService as any).getActionPrioritizer = () => ActionPrioritizer;
+    // CombatAIService avec injection constructor robuste
+    this._aiService = new CombatAIService({
+      queryService: this._queryService,
+      actionService: this._actionService,
+      aiDecisionMaker: this._aiDecisionMaker,
+      threatAssessment: this._threatAssessment,
+      actionPrioritizer: ActionPrioritizer
+    });
   }
   
   /**
@@ -549,5 +581,304 @@ export class Combat {
     };
     
     return this._actionService.withConsumedAction(this, entityId, actionCostMap[actionType]);
+  }
+
+  /**
+   * PHASE 4 - ACTION 4.1.1: Effectuer une attaque d'arme
+   * Migré depuis CombatOrchestrationService - Logique métier dans Domain
+   */
+  performWeaponAttack(attackerId: string, weaponId: string, targetId: string): CombatResult {
+    try {
+      // Récupérer les entités
+      const attacker = this._entities.get(attackerId);
+      const target = this._entities.get(targetId);
+
+      if (!attacker) {
+        return {
+          newCombat: this,
+          success: false,
+          message: `Attaquant ${attackerId} non trouvé`
+        };
+      }
+
+      if (!target) {
+        return {
+          newCombat: this,
+          success: false,
+          message: `Cible ${targetId} non trouvée`
+        };
+      }
+
+      if (target.isDead) {
+        return {
+          newCombat: this,
+          success: false,
+          message: `La cible ${target.name} est déjà morte`
+        };
+      }
+
+      // Vérifications de base
+      if (!attacker.actionsRemaining.action) {
+        return {
+          newCombat: this,
+          success: false,
+          message: `${attacker.name} n'a plus d'actions disponibles`
+        };
+      }
+
+      // LOGIQUE MÉTIER CENTRALISÉE - Jets d'attaque avec injection
+      const attackRoll = this.dependencies.diceRollingService.rollD20();
+      const attackBonus = this.dependencies.abilityCalculationService.calculateModifier(attacker.abilities.strength) + attacker.proficiencyBonus;
+      const totalAttackRoll = attackRoll + attackBonus;
+      
+      // Vérifier si l'attaque touche
+      const targetAC = target.baseAC;
+      const hits = totalAttackRoll >= targetAC;
+
+      if (!hits) {
+        // Attaque ratée - consommer l'action quand même
+        const combatAfterAction = this.withActionConsumed(attackerId, 'action');
+        return {
+          newCombat: combatAfterAction,
+          success: true,
+          message: `${attacker.name} rate son attaque contre ${target.name} (${totalAttackRoll} vs AC ${targetAC})`,
+          attackRoll: totalAttackRoll,
+          damage: 0
+        };
+      }
+
+      // Attaque réussie - calculer les dégâts avec injection
+      // Créer une arme temporaire pour le calcul (logique simplifiée)
+      const tempWeapon = {
+        damage: { diceCount: 1, diceType: 6 },
+        category: 'melee' as const,
+        properties: [] as string[]
+      };
+      
+      const damage = this.dependencies.damageCalculationService.calculateWeaponDamage(tempWeapon, attacker);
+      
+      // Appliquer les effets via l'API immutable PROPRE
+      let newCombat = this;
+      
+      // 1. Consommer l'action
+      newCombat = newCombat.withActionConsumed(attackerId, 'action');
+      
+      // 2. Appliquer les dégâts
+      newCombat = newCombat.withDamageApplied(targetId, damage);
+
+      return {
+        newCombat,
+        success: true,
+        message: `${attacker.name} touche ${target.name} pour ${damage} dégâts (jet: ${totalAttackRoll} vs AC ${targetAC})`,
+        attackRoll: totalAttackRoll,
+        damage
+      };
+
+    } catch (error) {
+      return {
+        newCombat: this,
+        success: false,
+        message: `Erreur lors de l'attaque: ${error instanceof Error ? error.message : 'Erreur inconnue'}`
+      };
+    }
+  }
+
+  /**
+   * PHASE 4 - ACTION 4.1.2: Lancer un sort
+   * Migré depuis CombatOrchestrationService - Logique métier dans Domain
+   */
+  castSpell(
+    casterId: string,
+    spellId: string,
+    level: SpellLevel,
+    targetId?: string
+  ): CombatResult {
+    try {
+      const caster = this._entities.get(casterId);
+      if (!caster) {
+        return {
+          newCombat: this,
+          success: false,
+          message: `Lanceur ${casterId} non trouvé`,
+          spellLevel: level
+        };
+      }
+
+      // Trouver le sort dans la liste des sorts connus
+      const spell = caster.knownSpells.find(s => s.id === spellId);
+      if (!spell) {
+        return {
+          newCombat: this,
+          success: false,
+          message: `Sort ${spellId} non connu par ${caster.name}`,
+          spellLevel: level
+        };
+      }
+
+      // Vérifier l'emplacement de sort disponible
+      if (!spell.isCantrip() && (caster.spellSlots as any)[level] <= 0) {
+        return {
+          newCombat: this,
+          success: false,
+          message: `Aucun emplacement de sort de niveau ${level} disponible`,
+          spellLevel: level
+        };
+      }
+
+      // Vérifier l'action requise
+      const hasRequiredAction = spell.castingTime === 'bonus_action' 
+        ? caster.actionsRemaining.bonusAction
+        : caster.actionsRemaining.action;
+
+      if (!hasRequiredAction) {
+        return {
+          newCombat: this,
+          success: false,
+          message: `${caster.name} n'a pas l'action requise pour lancer ce sort`,
+          spellLevel: level
+        };
+      }
+
+      // LOGIQUE MÉTIER DU SORT - Application immutable
+      let newCombat = this;
+      let totalDamage = 0;
+      let totalHealing = 0;
+
+      // Consommer l'action appropriée
+      const actionType = spell.castingTime === 'bonus_action' ? 'bonusAction' : 'action';
+      newCombat = newCombat.withActionConsumed(casterId, actionType);
+
+      // Appliquer les effets selon le type de sort
+      if (spell.effects.damage && targetId) {
+        const target = this._entities.get(targetId);
+        if (target && !target.isDead) {
+          totalDamage = this.calculateSpellDamage(spell, level, caster);
+          newCombat = newCombat.withDamageApplied(targetId, totalDamage);
+        }
+      }
+
+      if (spell.effects.healing && targetId) {
+        const target = this._entities.get(targetId);
+        if (target && !target.isDead) {
+          totalHealing = this.calculateSpellHealing(spell, level, caster);
+          newCombat = newCombat.withHealing(targetId, totalHealing);
+        }
+      }
+
+      const effectMessage = totalDamage > 0 ? ` (${totalDamage} dégâts)` :
+                           totalHealing > 0 ? ` (${totalHealing} soins)` : '';
+
+      return {
+        newCombat,
+        success: true,
+        message: `${caster.name} lance ${spell.name}${effectMessage}`,
+        damage: totalDamage || undefined,
+        healing: totalHealing || undefined,
+        spellLevel: level
+      };
+
+    } catch (error) {
+      return {
+        newCombat: this,
+        success: false,
+        message: `Erreur lors du lancement du sort: ${error instanceof Error ? error.message : 'Erreur inconnue'}`,
+        spellLevel: level
+      };
+    }
+  }
+
+  /**
+   * Calculer les dégâts d'un sort avec injection de dépendances
+   */
+  private calculateSpellDamage(spell: Spell, level: SpellLevel, caster: CombatEntity): number {
+    // Utiliser la méthode du sort s'il l'a, sinon logique par défaut
+    if (spell.calculateDamage) {
+      const spellcastingMod = this.getSpellcastingModifier(caster);
+      return spell.calculateDamage(this.dependencies.diceRollingService, level, spellcastingMod, caster.proficiencyBonus);
+    }
+    
+    // Logique par défaut avec injection diceRollingService
+    return this.dependencies.diceRollingService.rollD6() + level;
+  }
+
+  /**
+   * Calculer les soins d'un sort avec injection de dépendances
+   */
+  private calculateSpellHealing(spell: Spell, level: SpellLevel, caster: CombatEntity): number {
+    // Utiliser la méthode du sort s'il l'a, sinon logique par défaut
+    if (spell.calculateHealing) {
+      const spellcastingMod = this.getSpellcastingModifier(caster);
+      return spell.calculateHealing(this.dependencies.diceRollingService, level, spellcastingMod);
+    }
+    
+    // Logique par défaut avec injection diceRollingService
+    return this.dependencies.diceRollingService.rollD6() + level + 2;
+  }
+
+  /**
+   * Obtenir le modificateur d'incantation avec injection AbilityCalculationService
+   */
+  private getSpellcastingModifier(caster: CombatEntity): number {
+    if (!caster.spellcastingAbility) return 0;
+    
+    const ability = caster.abilities[caster.spellcastingAbility];
+    return this.dependencies.abilityCalculationService.calculateModifier(ability);
+  }
+
+  /**
+   * PHASE 4 - ACTION 4.1.3: Exécuter un mouvement
+   * Migré depuis CombatOrchestrationService - Logique métier dans Domain
+   */
+  executeMovement(entityId: string, newPosition: Position): CombatResult {
+    try {
+      const entity = this._entities.get(entityId);
+      if (!entity) {
+        return {
+          newCombat: this,
+          success: false,
+          message: `Entité ${entityId} non trouvée`
+        };
+      }
+
+      if (entity.isDead) {
+        return {
+          newCombat: this,
+          success: false,
+          message: `${entity.name} est mort et ne peut pas se déplacer`
+        };
+      }
+
+      if (entity.actionsRemaining.movement <= 0) {
+        return {
+          newCombat: this,
+          success: false,
+          message: `${entity.name} n'a plus de mouvement disponible`
+        };
+      }
+
+      // Vérifier les attaques d'opportunité AVANT le mouvement (méthode existante)
+      const opportunityAttackers = this.checkOpportunityAttacks(entityId, entity.position, newPosition);
+      
+      // Effectuer le mouvement via l'API immutable (méthode existante)
+      const newCombat = this.withEntityMoved(entityId, newPosition);
+
+      const opportunityMessage = opportunityAttackers.length > 0 
+        ? ` (provoque ${opportunityAttackers.length} attaque(s) d'opportunité)`
+        : '';
+
+      return {
+        newCombat,
+        success: true,
+        message: `${entity.name} se déplace${opportunityMessage}`,
+        opportunityAttacks: opportunityAttackers
+      };
+
+    } catch (error) {
+      return {
+        newCombat: this,
+        success: false,
+        message: `Erreur lors du mouvement: ${error instanceof Error ? error.message : 'Erreur inconnue'}`
+      };
+    }
   }
 }

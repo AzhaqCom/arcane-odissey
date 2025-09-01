@@ -4,6 +4,7 @@
  */
 
 // import { type GridPosition } from './TacticalGrid'; // Non utilisé actuellement
+import type { DiceRollingService } from '../services/DiceRollingService';
 
 export type ActionType = 
   | 'attack' | 'spell' | 'dash' | 'dodge' | 'help' | 'hide' | 'ready' | 'search' | 'use_object'
@@ -104,18 +105,17 @@ export class Action {
   /**
    * Calculer les dégâts de l'action
    */
-  calculateDamage(abilityModifier: number = 0, _proficiencyBonus: number = 0): number {
+  calculateDamage(
+    diceRollingService: DiceRollingService,
+    abilityModifier: number = 0, 
+    _proficiencyBonus: number = 0
+  ): number {
     if (!this._effects.damage) return 0;
 
     let totalDamage = 0;
     
     this._effects.damage.forEach(damageRoll => {
-      // Simule le lancer de dés
-      let rollResult = 0;
-      for (let i = 0; i < damageRoll.diceCount; i++) {
-        rollResult += Math.floor(Math.random() * damageRoll.diceType) + 1;
-      }
-      
+      const rollResult = diceRollingService.rollDamage(damageRoll.diceCount, damageRoll.diceType);
       totalDamage += rollResult + damageRoll.modifier + abilityModifier;
     });
 
@@ -125,17 +125,17 @@ export class Action {
   /**
    * Calculer les soins de l'action
    */
-  calculateHealing(_abilityModifier: number = 0, spellcastingModifier: number = 0): number {
+  calculateHealing(
+    diceRollingService: DiceRollingService,
+    _abilityModifier: number = 0, 
+    spellcastingModifier: number = 0
+  ): number {
     if (!this._effects.healing) return 0;
 
     let totalHealing = 0;
     
     this._effects.healing.forEach(healingRoll => {
-      let rollResult = 0;
-      for (let i = 0; i < healingRoll.diceCount; i++) {
-        rollResult += Math.floor(Math.random() * healingRoll.diceType) + 1;
-      }
-      
+      const rollResult = diceRollingService.rollDamage(healingRoll.diceCount, healingRoll.diceType);
       totalHealing += rollResult + healingRoll.modifier + spellcastingModifier;
     });
 

@@ -4,6 +4,7 @@
  */
 
 import { Action, type DamageRoll, type DamageType, type AbilityScore } from './Action';
+import type { DiceRollingService } from '../services/DiceRollingService';
 
 export type WeaponCategory = 'melee' | 'ranged';
 export type WeaponProperty = 
@@ -150,18 +151,18 @@ export class Weapon {
   /**
    * Calculer les dégâts avec modificateurs
    */
-  calculateDamage(abilityModifier: number = 0, proficiencyBonus: number = 0): number {
+  calculateDamage(
+    diceRollingService: DiceRollingService,
+    abilityModifier: number = 0, 
+    proficiencyBonus: number = 0
+  ): number {
     const [diceCount, diceType] = this.parseDice(this._damage.dice);
     
-    let totalDamage = 0;
-    
-    // Lancer les dés
-    for (let i = 0; i < diceCount; i++) {
-      totalDamage += Math.floor(Math.random() * diceType) + 1;
-    }
+    // Lancer les dés via le service injecté
+    const rollResult = diceRollingService.rollDamage(diceCount, diceType);
     
     // Ajouter les bonus
-    totalDamage += this._damage.bonus + abilityModifier;
+    const totalDamage = rollResult + this._damage.bonus + abilityModifier;
     
     return Math.max(1, totalDamage);
   }

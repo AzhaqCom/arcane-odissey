@@ -5,6 +5,7 @@
 
 import { Action, type ActionEffect, type DamageRoll, type AbilityScore } from './Action';
 import { type GridPosition } from './TacticalGrid';
+import type { DiceRollingService } from '../services/DiceRollingService';
 
 export type SpellLevel = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9; // 0 = Cantrip
 export type SpellSchool =
@@ -141,6 +142,7 @@ export class Spell {
    * Calculer les dégâts du sort au niveau donné
    */
   calculateDamage(
+    diceRollingService: DiceRollingService,
     castAtLevel: SpellLevel,
     spellcastingModifier: number = 0,
     proficiencyBonus: number = 0
@@ -154,10 +156,7 @@ export class Spell {
     this._effects.damage.forEach(damageRoll => {
       // Pour chaque projectile
       for (let projectile = 0; projectile < projectileCount; projectile++) {
-        let rollResult = 0;
-        for (let i = 0; i < damageRoll.diceCount; i++) {
-          rollResult += Math.floor(Math.random() * damageRoll.diceType) + 1;
-        }
+        const rollResult = diceRollingService.rollDamage(damageRoll.diceCount, damageRoll.diceType);
         totalDamage += rollResult + damageRoll.modifier + spellcastingModifier;
       }
     });
@@ -199,6 +198,7 @@ export class Spell {
    * Calculer les soins du sort au niveau donné
    */
   calculateHealing(
+    diceRollingService: DiceRollingService,
     castAtLevel: SpellLevel,
     spellcastingModifier: number = 0
   ): number {
@@ -208,12 +208,8 @@ export class Spell {
     const levelDifference = Math.max(0, castAtLevel - this._level);
 
     this._effects.healing.forEach(healingRoll => {
-      let rollResult = 0;
-      for (let i = 0; i < healingRoll.diceCount; i++) {
-        rollResult += Math.floor(Math.random() * healingRoll.diceType) + 1;
-      }
-
-      const levelBonus = this.calculateLevelBonus(levelDifference);
+      const rollResult = diceRollingService.rollDamage(healingRoll.diceCount, healingRoll.diceType);
+      const levelBonus = this.calculateLevelBonus(diceRollingService, levelDifference);
       totalHealing += rollResult + healingRoll.modifier + spellcastingModifier + levelBonus;
     });
 
@@ -254,15 +250,11 @@ export class Spell {
 
   // MÉTHODES PRIVÉES
 
-  private calculateLevelBonus(levelDifference: number): number {
+  private calculateLevelBonus(diceRollingService: DiceRollingService, levelDifference: number): number {
     // Règle générale : +1d6 de dégâts par niveau supérieur
     if (levelDifference === 0) return 0;
 
-    let bonus = 0;
-    for (let i = 0; i < levelDifference; i++) {
-      bonus += Math.floor(Math.random() * 6) + 1;
-    }
-    return bonus;
+    return diceRollingService.rollDamage(levelDifference, 6);
   }
 }
 

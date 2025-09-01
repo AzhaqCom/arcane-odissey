@@ -5,10 +5,11 @@
  */
 
 import { GameSession, Scene } from '../../domain/entities';
-import { GameNarrativeService, type NarrativeMessage } from '../../domain/services/GameNarrativeService';
+import type { NarrativeMessage } from '../../domain/services/GameNarrativeService';
 import type { GameUseCase, GameStateSnapshot } from './GameUseCase';
 import type { SceneUseCase, SceneAnalysis } from './SceneUseCase';
 import { logger } from '../../infrastructure/services/Logger';
+import { DIContainer } from '../../infrastructure/container/DIContainer';
 
 /**
  * Interface représentant l'état complet d'une session de jeu
@@ -52,7 +53,10 @@ export class GameSessionUseCase {
   ) {
     this.gameUseCase = gameUseCase;
     this.sceneUseCase = sceneUseCase;
+    this.gameNarrativeService = DIContainer.getInstance().get('GameNarrativeService');
   }
+
+  private gameNarrativeService: any;
 
   /**
    * Initialiser une nouvelle session de jeu complète
@@ -102,7 +106,7 @@ export class GameSessionUseCase {
 
       // === PHASE 5: NARRATIVE MESSAGE GENERATION ===
       const narrativeMessages = [
-        GameNarrativeService.createNarrativeMessage(
+        this.gameNarrativeService.createNarrativeMessage(
           `Jeu initialisé - Scène: ${gameSession.currentSceneId}`,
           'normal'
         )
@@ -218,7 +222,7 @@ export class GameSessionUseCase {
         const newState = await this.refreshSessionState();
         
         // Générer un message narratif de transition
-        const narrativeMessage = GameNarrativeService.createNarrativeMessage(
+        const narrativeMessage = this.gameNarrativeService.createNarrativeMessage(
           `Transition vers la scène : ${targetSceneId}`,
           'normal'
         );
@@ -265,7 +269,7 @@ export class GameSessionUseCase {
       if (result.success) {
         // Générer un message narratif de repos
         const restTypeText = restType === 'short' ? 'court' : 'long';
-        const narrativeMessage = GameNarrativeService.createHealingMessage(
+        const narrativeMessage = this.gameNarrativeService.createHealingMessage(
           'Vous',
           'Vous',
           result.hpRestored || 0,
@@ -312,7 +316,7 @@ export class GameSessionUseCase {
       
       if (success) {
         // Générer un message narratif de sauvegarde
-        const narrativeMessage = GameNarrativeService.createNarrativeMessage(
+        const narrativeMessage = this.gameNarrativeService.createNarrativeMessage(
           'Partie sauvegardée avec succès',
           'low'
         );

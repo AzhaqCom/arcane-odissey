@@ -11,6 +11,11 @@ import type { Action } from '../entities/Action';
 import type { Spell, SpellLevel } from '../entities/Spell';
 import type { ValidationResult } from '../entities/ActionValidator';
 import type { PriorityCriteria } from '../entities/ActionPrioritizer';
+import type { CombatQueryService } from './CombatQueryService';
+import type { CombatActionService } from './CombatActionService';
+import type { AIDecisionMaker } from '../entities/AIDecisionMaker';
+import type { ThreatAssessment } from '../entities/ThreatAssessment';
+import type { ActionPrioritizer } from '../entities/ActionPrioritizer';
 
 export interface AIContext {
   readonly entity: CombatEntity;
@@ -44,18 +49,28 @@ export interface AIExecutionResult {
   readonly reasons?: readonly string[];
 }
 
+export interface CombatAIServiceDependencies {
+  readonly queryService: CombatQueryService;
+  readonly actionService: CombatActionService;
+  readonly aiDecisionMaker: AIDecisionMaker;
+  readonly threatAssessment: ThreatAssessment;
+  readonly actionPrioritizer: typeof ActionPrioritizer;
+}
+
 /**
  * SERVICE D'INTELLIGENCE ARTIFICIELLE COMBAT
  * Centralise toute la logique de prise de décision IA
  */
 export class CombatAIService {
+  
+  constructor(private readonly dependencies: CombatAIServiceDependencies) {}
 
   /**
    * Exécuter un tour d'IA pour l'entité courante
    */
   executeAITurn(combat: Combat): AIExecutionResult | null {
-    const queryService = this.getQueryService();
-    const actionService = this.getActionService();
+    const queryService = this.dependencies.queryService;
+    const actionService = this.dependencies.actionService;
     
     const currentEntity = queryService.getCurrentEntity(combat);
     if (!currentEntity || currentEntity.type === 'player') {
@@ -66,7 +81,7 @@ export class CombatAIService {
     const context = this.buildAIContext(combat, currentEntity);
 
     // L'IA décide de l'action optimale via AIDecisionMaker
-    const aiDecisionMaker = this.getAIDecisionMaker(combat);
+    const aiDecisionMaker = this.dependencies.aiDecisionMaker;
     const decision = aiDecisionMaker.decideAction(currentEntity.id);
     
     if (!decision) {
@@ -124,7 +139,7 @@ export class CombatAIService {
    * Obtenir l'analyse des menaces pour une entité
    */
   getThreatAnalysis(combat: Combat, entityId: string, targetId: string): ThreatAssessment {
-    const threatAssessment = this.getThreatAssessmentService(combat);
+    const threatAssessment = this.dependencies.threatAssessment;
     const rawAnalysis = threatAssessment.analyzeThreat(entityId, targetId);
     
     // Convertir l'analyse brute en format standardisé
@@ -138,7 +153,7 @@ export class CombatAIService {
     const entity = combat.entities.get(perspectiveEntityId);
     if (!entity) return [];
 
-    const threatAssessment = this.getThreatAssessmentService(combat);
+    const threatAssessment = this.dependencies.threatAssessment;
     const rawThreats = threatAssessment.assessAreaThreats(
       { x: centerPos.x, y: centerPos.y },
       radius,
@@ -156,7 +171,7 @@ export class CombatAIService {
     if (!entity) return [];
 
     const context = this.buildAIContext(combat, entity);
-    const actionPrioritizer = this.getActionPrioritizer();
+    const actionPrioritizer = this.dependencies.actionPrioritizer;
     
     return actionPrioritizer.prioritizeActions(entity, context, criteria);
   }
@@ -165,7 +180,7 @@ export class CombatAIService {
    * Évaluer les défenses d'une entité
    */
   assessDefenses(combat: Combat, entityId: string): any {
-    const threatAssessment = this.getThreatAssessmentService(combat);
+    const threatAssessment = this.dependencies.threatAssessment;
     return threatAssessment.assessDefenses(entityId);
   }
 
@@ -173,7 +188,7 @@ export class CombatAIService {
    * Identifier les cibles prioritaires pour une entité
    */
   identifyPriorityTargets(combat: Combat, attackerId: string): string[] {
-    const threatAssessment = this.getThreatAssessmentService(combat);
+    const threatAssessment = this.dependencies.threatAssessment;
     return threatAssessment.identifyPriorityTargets(attackerId);
   }
 
@@ -181,7 +196,7 @@ export class CombatAIService {
    * Construire le contexte d'intelligence artificielle pour une entité
    */
   buildAIContext(combat: Combat, entity: CombatEntity): AIContext {
-    const queryService = this.getQueryService();
+    const queryService = this.dependencies.queryService;
     
     const allEntities = Array.from(combat.entities.values()).filter(e => !e.isDead);
     const allies = allEntities.filter(e => queryService.isAllyOf(entity, e));
@@ -258,40 +273,4 @@ export class CombatAIService {
     };
   }
 
-  // === MÉTHODES D'INJECTION DE DÉPENDANCES ===
-
-  /**
-   * Obtenir le service de requêtes (injecté par Combat.ts)
-   */
-  private getQueryService(): any {
-    throw new Error('QueryService not injected. This method should be overridden by Combat.ts');
-  }
-
-  /**
-   * Obtenir le service d'actions (injecté par Combat.ts)
-   */
-  private getActionService(): any {
-    throw new Error('ActionService not injected. This method should be overridden by Combat.ts');
-  }
-
-  /**
-   * Obtenir le décisionneur IA (injecté par Combat.ts)
-   */
-  private getAIDecisionMaker(combat: Combat): any {
-    throw new Error('AIDecisionMaker not injected. This method should be overridden by Combat.ts');
-  }
-
-  /**
-   * Obtenir le service d'évaluation des menaces (injecté par Combat.ts)
-   */
-  private getThreatAssessmentService(combat: Combat): any {
-    throw new Error('ThreatAssessment not injected. This method should be overridden by Combat.ts');
-  }
-
-  /**
-   * Obtenir le prioriseur d'actions (injecté par Combat.ts)
-   */
-  private getActionPrioritizer(): any {
-    throw new Error('ActionPrioritizer not injected. This method should be overridden by Combat.ts');
-  }
 }

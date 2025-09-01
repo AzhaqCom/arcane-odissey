@@ -6,26 +6,29 @@
 
 import { NarrativeMessage, type MessagePriority } from '../entities/NarrativeMessage';
 import type { Position } from '../types';
+import type { DiceRollingService } from './DiceRollingService';
 
 /**
  * SERVICE DE GÉNÉRATION DE MESSAGES NARRATIFS
- * Toutes les méthodes sont statiques et pures (pas d'état)
+ * Refactorisé en service non-statique avec injection
  */
 export class GameNarrativeService {
+
+  constructor(private readonly diceRollingService: DiceRollingService) {}
 
   // === COMBAT MESSAGES ===
 
   /**
    * Message de début de combat
    */
-  static createCombatStartMessage(): NarrativeMessage {
+  createCombatStartMessage(): NarrativeMessage {
     return new NarrativeMessage('combat', 'Un combat commence !', 'high');
   }
 
   /**
    * Message de fin de combat
    */
-  static createCombatEndMessage(victory: boolean): NarrativeMessage {
+  createCombatEndMessage(victory: boolean): NarrativeMessage {
     const content = victory ? 'Victoire ! Le combat se termine.' : 'Défaite... Le combat se termine.';
     return new NarrativeMessage('combat', content, 'high');
   }
@@ -33,7 +36,7 @@ export class GameNarrativeService {
   /**
    * Message d'initiative calculée
    */
-  static createInitiativeMessage(
+  createInitiativeMessage(
     entityName: string, 
     roll: number, 
     abilityModifier: number
@@ -48,7 +51,7 @@ export class GameNarrativeService {
   /**
    * Message d'attaque avec arme
    */
-  static createAttackMessage(
+  createAttackMessage(
     attackerName: string,
     targetName: string,
     weaponName: string,
@@ -74,7 +77,7 @@ export class GameNarrativeService {
   /**
    * Message de mouvement d'entité
    */
-  static createMovementMessage(
+  createMovementMessage(
     entityName: string, 
     fromPos: Position, 
     toPos: Position
@@ -86,7 +89,7 @@ export class GameNarrativeService {
   /**
    * Message de lancement de sort
    */
-  static createSpellMessage(
+  createSpellMessage(
     casterName: string,
     spellName: string,
     targetName?: string,
@@ -110,7 +113,7 @@ export class GameNarrativeService {
   /**
    * Message de soins
    */
-  static createHealingMessage(
+  createHealingMessage(
     healerName: string,
     targetName: string,
     healing: number,
@@ -131,7 +134,7 @@ export class GameNarrativeService {
   /**
    * Message d'action générique
    */
-  static createActionMessage(entityName: string, actionName: string): NarrativeMessage {
+  createActionMessage(entityName: string, actionName: string): NarrativeMessage {
     const content = `${entityName} utilise l'action ${actionName}`;
     return new NarrativeMessage('combat', content);
   }
@@ -141,7 +144,7 @@ export class GameNarrativeService {
   /**
    * Message de gain d'expérience
    */
-  static createExperienceGainMessage(amount: number): NarrativeMessage {
+  createExperienceGainMessage(amount: number): NarrativeMessage {
     const content = `Vous gagnez ${amount} points d'expérience`;
     const priority: MessagePriority = amount >= 500 ? 'high' : 'normal';
     return new NarrativeMessage('system', content, priority);
@@ -150,7 +153,7 @@ export class GameNarrativeService {
   /**
    * Message de montée de niveau
    */
-  static createLevelUpMessage(characterName: string, newLevel: number): NarrativeMessage {
+  createLevelUpMessage(characterName: string, newLevel: number): NarrativeMessage {
     const content = `${characterName} atteint le niveau ${newLevel} !`;
     return new NarrativeMessage('system', content, 'high');
   }
@@ -160,7 +163,7 @@ export class GameNarrativeService {
   /**
    * Message d'objet trouvé
    */
-  static createItemFoundMessage(itemName: string, quantity: number = 1): NarrativeMessage {
+  createItemFoundMessage(itemName: string, quantity: number = 1): NarrativeMessage {
     const content = quantity > 1 
       ? `Vous trouvez : ${itemName} (×${quantity})`
       : `Vous trouvez : ${itemName}`;
@@ -170,7 +173,7 @@ export class GameNarrativeService {
   /**
    * Message d'objet équipé
    */
-  static createItemEquippedMessage(itemName: string): NarrativeMessage {
+  createItemEquippedMessage(itemName: string): NarrativeMessage {
     const content = `Vous équipez : ${itemName}`;
     return new NarrativeMessage('item', content);
   }
@@ -178,7 +181,7 @@ export class GameNarrativeService {
   /**
    * Message d'objet vendu/acheté
    */
-  static createItemTradeMessage(
+  createItemTradeMessage(
     itemName: string, 
     action: 'buy' | 'sell', 
     price: number
@@ -193,14 +196,14 @@ export class GameNarrativeService {
   /**
    * Message narratif général
    */
-  static createNarrativeMessage(content: string, priority: MessagePriority = 'normal'): NarrativeMessage {
+  createNarrativeMessage(content: string, priority: MessagePriority = 'normal'): NarrativeMessage {
     return new NarrativeMessage('narrative', content, priority);
   }
 
   /**
    * Message de dialogue
    */
-  static createDialogueMessage(speakerName: string, dialogue: string): NarrativeMessage {
+  createDialogueMessage(speakerName: string, dialogue: string): NarrativeMessage {
     const content = `${speakerName} : "${dialogue}"`;
     return new NarrativeMessage('narrative', content);
   }
@@ -208,7 +211,7 @@ export class GameNarrativeService {
   /**
    * Message de découverte d'environnement
    */
-  static createDiscoveryMessage(discovery: string): NarrativeMessage {
+  createDiscoveryMessage(discovery: string): NarrativeMessage {
     return new NarrativeMessage('narrative', discovery, 'normal');
   }
 
@@ -217,7 +220,7 @@ export class GameNarrativeService {
   /**
    * Message de bienvenue aléatoire au lancement de l'application
    */
-  static createWelcomeMessage(): NarrativeMessage {
+  createWelcomeMessage(): NarrativeMessage {
     const welcomeMessages = [
       "La fortune sourit aux audacieux",
       "L'aventure vous attend au-delà de l'horizon", 
@@ -229,7 +232,7 @@ export class GameNarrativeService {
       "Dans l'ombre du danger, brille la gloire"
     ];
     
-    const randomIndex = Math.floor(Math.random() * welcomeMessages.length);
+    const randomIndex = this.diceRollingService.rollDamage(1, welcomeMessages.length) - 1;
     const selectedMessage = welcomeMessages[randomIndex];
     
     return new NarrativeMessage('narrative', selectedMessage, 'normal');
@@ -238,14 +241,14 @@ export class GameNarrativeService {
   /**
    * Message de sauvegarde
    */
-  static createSaveMessage(): NarrativeMessage {
+  createSaveMessage(): NarrativeMessage {
     return new NarrativeMessage('system', 'Partie sauvegardée', 'low');
   }
 
   /**
    * Message d'erreur utilisateur (sans stack trace)
    */
-  static createUserErrorMessage(errorMessage: string): NarrativeMessage {
+  createUserErrorMessage(errorMessage: string): NarrativeMessage {
     return new NarrativeMessage('system', `Erreur : ${errorMessage}`, 'normal');
   }
 }

@@ -7,6 +7,7 @@ import { type CombatEntity, Combat } from './Combat';
 import { type Action } from './Action';
 import { type Spell } from './Spell';
 import { type GridPosition, TacticalGrid } from './TacticalGrid';
+import type { DiceRollingService } from '../services/DiceRollingService';
 
 export interface ThreatAnalysis {
   readonly entityId: string;
@@ -56,6 +57,8 @@ export interface DefensiveAssessment {
  * Analyse complète des menaces pour prise de décision tactique
  */
 export class ThreatAssessment {
+
+  constructor(private readonly diceRollingService: DiceRollingService) {}
 
   /**
    * Analyser toutes les menaces pour une entité
@@ -214,7 +217,7 @@ export class ThreatAssessment {
     const damageActions = threat.availableActions.filter(action => action.effects.damage);
     if (damageActions.length > 0) {
       const maxDamage = Math.max(...damageActions.map(action => 
-        action.calculateDamage(this.getAbilityModifier(threat, 'strength'), threat.proficiencyBonus)
+        action.calculateDamage(this.diceRollingService, this.getAbilityModifier(threat, 'strength'), threat.proficiencyBonus)
       ));
       damageScore += Math.min(50, maxDamage);
     }
@@ -225,7 +228,7 @@ export class ThreatAssessment {
       const highestSlot = threat.spellSlots.getHighestAvailableSlotLevel();
       if (highestSlot !== null && highestSlot > 0) {
         const maxSpellDamage = Math.max(...damageSpells.map(spell =>
-          spell.calculateDamage(highestSlot, this.getSpellcastingModifier(threat), threat.proficiencyBonus)
+          spell.calculateDamage(this.diceRollingService, highestSlot, this.getSpellcastingModifier(threat), threat.proficiencyBonus)
         ));
         damageScore += Math.min(40, maxSpellDamage);
       }
