@@ -17,7 +17,7 @@ Contexte : Nous avons résolu avec succès le problème de désynchronisation en
    * src/domain/services/DiceRollingService.ts
    * src/domain/services/CombatActionService.ts
    * src/domain/entities/TacticalGrid.ts
-
+   Ainsi que sur les fichiers relatifs a l'ia
   ---
 
   Phase 1 : Rendre le tour de l'IA fonctionnel
