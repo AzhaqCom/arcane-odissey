@@ -397,9 +397,18 @@ export class ActionValidator {
     }
 
     // Vérifier que la zone d'effet ne sort pas de la grille
+    // Conversion des formes AoE vers formes acceptées par la grille
+    let gridShape: 'circle' | 'cone' | 'line' | 'square';
+    switch (aoe.shape) {
+      case 'sphere': gridShape = 'circle'; break;
+      case 'cube': gridShape = 'square'; break;
+      case 'cylinder': gridShape = 'circle'; break;
+      default: gridShape = aoe.shape as 'circle' | 'cone' | 'line' | 'square'; break;
+    }
+
     const affectedPositions = tacticalGrid.getAreaOfEffect(
       targetPosition,
-      aoe.shape === 'sphere' ? 'circle' : aoe.shape,
+      gridShape,
       aoe.size
     );
 

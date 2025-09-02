@@ -29,6 +29,7 @@ import { ActionPrioritizer } from '../../domain/entities/ActionPrioritizer';
 import { ThreatAssessment } from '../../domain/entities/ThreatAssessment';
 import { CombatActionService } from '../../domain/services/CombatActionService';
 import type { IRandomNumberGenerator } from '../../domain/services/DiceRollingService';
+import { Combat } from '../../domain/entities/Combat';
 
 // Création d'un CombatRepository temporaire (en attendant implémentation propre)
 class TempCombatRepository {
@@ -147,7 +148,16 @@ export class DIContainer {
     logger.debug('DI_CONTAINER', 'Domain services initialized');
 
     // ===== USE CASES UNIFIÉS =====
-    const combatUseCase = new CombatUseCase(combatRepository, characterRepository, effectsRepository, weaponRepository);
+    const combatUseCase = new CombatUseCase(
+      combatRepository, 
+      characterRepository, 
+      gameNarrativeService,
+      diceRollingService,
+      initiativeService,
+      this.createCombat.bind(this),
+      effectsRepository, 
+      weaponRepository
+    );
     const sceneUseCase = new SceneUseCase(sceneRepository);
     const gameUseCase = new GameUseCase(sceneUseCase, characterRepository); // Repository unifié
 
@@ -161,10 +171,12 @@ export class DIContainer {
   /**
    * Factory pour créer Combat avec dépendances injectées
    */
-  createCombat(id: string, gridDimensions?: any): any {
-    const Combat = require('../../domain/entities/Combat').Combat;
+  createCombat(id: string, gridDimensions?: any): Combat {
+    logger.debug('DI_CONTAINER', 'Creating Combat with dependencies...', {
+      servicesRegistered: Array.from(this.services.keys())
+    });
 
-    return new Combat(id, gridDimensions, {
+    const dependencies = {
       diceRollingService: this.get('DiceRollingService'),
       damageCalculationService: this.get('DamageCalculationService'),
       abilityCalculationService: this.get('AbilityCalculationService'),
@@ -173,8 +185,19 @@ export class DIContainer {
       actionPrioritizer: this.get('ActionPrioritizer'),
       threatAssessment: this.get('ThreatAssessment'),
       combatActionService: this.get('CombatActionService')
+    };
+
+    logger.debug('DI_CONTAINER', 'Combat dependencies resolved', {
+      diceRollingService: !!dependencies.diceRollingService,
+      damageCalculationService: !!dependencies.damageCalculationService,
+      abilityCalculationService: !!dependencies.abilityCalculationService
     });
+
+    return new Combat(id, gridDimensions, dependencies);
   }
+
+  // PHASE 2 - Getters statiques supprimés pour éviter les dépendances circulaires
+  // Les services sont maintenant injectés directement dans les constructeurs
 }
 
 // Tokens pour l'injection

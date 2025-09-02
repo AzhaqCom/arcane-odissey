@@ -62,8 +62,11 @@ export interface CombatAIServiceDependencies {
  * Centralise toute la logique de prise de décision IA
  */
 export class CombatAIService {
+  private dependencies: CombatAIServiceDependencies;
   
-  constructor(private readonly dependencies: CombatAIServiceDependencies) {}
+  constructor(dependencies: CombatAIServiceDependencies) {
+    this.dependencies = dependencies;
+  }
 
   /**
    * Exécuter un tour d'IA pour l'entité courante

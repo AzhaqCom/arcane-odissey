@@ -5,7 +5,7 @@
  */
 
 import { GameSession, Scene } from '../../domain/entities';
-import type { NarrativeMessage } from '../../domain/services/GameNarrativeService';
+import type { NarrativeMessage } from '../../domain/entities/NarrativeMessage';
 import type { GameUseCase, GameStateSnapshot } from './GameUseCase';
 import type { SceneUseCase, SceneAnalysis } from './SceneUseCase';
 import { logger } from '../../infrastructure/services/Logger';

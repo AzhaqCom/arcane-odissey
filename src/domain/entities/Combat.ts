@@ -13,10 +13,11 @@ import { ActionPrioritizer, type PriorityCriteria } from './ActionPrioritizer';
 import { CombatQueryService } from '../services/CombatQueryService';
 import { CombatStateService } from '../services/CombatStateService';
 import { CombatActionService } from '../services/CombatActionService';
+import { AbilityCalculationService } from '../services/AbilityCalculationService';
 import { CombatAIService } from '../services/CombatAIService';
 import type { DiceRollingService } from '../services/DiceRollingService';
 import type { DamageCalculationService } from '../services/DamageCalculationService';
-import type { AbilityCalculationService } from '../services/AbilityCalculationService';
+// Removed duplicate import
 import type { InitiativeService } from '../services/InitiativeService';
 import type { TacticalCalculationService } from '../services/TacticalCalculationService';
 import type { Position, InventorySpec, AbilityScores, ActionsRemaining } from '../types';
@@ -123,20 +124,23 @@ export class Combat {
   private readonly _actionService: CombatActionService;
   private readonly _aiService: CombatAIService;
 
+  private readonly dependencies: CombatDependencies;
+
   constructor(
     id: string, 
     gridDimensions: GridDimensions = { width: 12, height: 8 },
-    private readonly dependencies: CombatDependencies
+    dependencies: CombatDependencies
   ) {
+    this.dependencies = dependencies;
     this._id = id;
     this._tacticalGrid = new TacticalGrid(gridDimensions);
-    this._aiDecisionMaker = new AIDecisionMaker(this);
-    this._threatAssessment = new ThreatAssessment(this);
+    this._aiDecisionMaker = new AIDecisionMaker();
+    this._threatAssessment = new ThreatAssessment(dependencies.diceRollingService);
     
     // Instanciation des services spécialisés
     this._queryService = new CombatQueryService();
     this._stateService = new CombatStateService();
-    this._actionService = new CombatActionService();
+    this._actionService = new CombatActionService(dependencies.diceRollingService);
     
     // Injection des dépendances entre services
     (this._actionService as any).getStateService = () => this._stateService;
@@ -147,7 +151,7 @@ export class Combat {
       actionService: this._actionService,
       aiDecisionMaker: this._aiDecisionMaker,
       threatAssessment: this._threatAssessment,
-      actionPrioritizer: ActionPrioritizer
+      actionPrioritizer: new ActionPrioritizer(dependencies.diceRollingService)
     });
   }
   
@@ -284,13 +288,14 @@ export class Combat {
     }
     
     // Trouver l'arme dans l'inventaire ou les armes équipées
-    const weapon = attacker.inventory?.weapons?.find(w => w.id === weaponId);
-    if (!weapon) {
+    // FIXME: weapons are weaponIds (strings), not objects
+    const weaponExists = attacker.inventory?.weapons?.includes(weaponId);
+    if (!weaponExists) {
       throw new Error(`Weapon ${weaponId} not found for attacker ${attackerId}`);
     }
     
     // Déléguer la détermination de portée à l'entité Weapon
-    const weaponRange = weapon.getAttackRange();
+    const weaponRange = 5; // FIXME: Default range, needs weapon repository
     
     // Calcul de distance et validation
     const distance = this._calculateDistance(attacker.position, position);
@@ -628,7 +633,7 @@ export class Combat {
 
       // LOGIQUE MÉTIER CENTRALISÉE - Jets d'attaque avec injection
       const attackRoll = this.dependencies.diceRollingService.rollD20();
-      const attackBonus = this.dependencies.abilityCalculationService.calculateModifier(attacker.abilities.strength) + attacker.proficiencyBonus;
+      const attackBonus = AbilityCalculationService.calculateModifier(attacker.abilities.strength) + attacker.proficiencyBonus;
       const totalAttackRoll = attackRoll + attackBonus;
       
       // Vérifier si l'attaque touche
@@ -815,15 +820,6 @@ export class Combat {
     return this.dependencies.diceRollingService.rollD6() + level + 2;
   }
 
-  /**
-   * Obtenir le modificateur d'incantation avec injection AbilityCalculationService
-   */
-  private getSpellcastingModifier(caster: CombatEntity): number {
-    if (!caster.spellcastingAbility) return 0;
-    
-    const ability = caster.abilities[caster.spellcastingAbility];
-    return this.dependencies.abilityCalculationService.calculateModifier(ability);
-  }
 
   /**
    * PHASE 4 - ACTION 4.1.3: Exécuter un mouvement

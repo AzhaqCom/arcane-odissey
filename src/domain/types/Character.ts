@@ -24,6 +24,8 @@ export interface InventorySpec {
     readonly itemId: string;
     readonly quantity: number;
   }>;
+  // PHASE 1 - Ajout propriété weapons pour compatibilité
+  readonly weapons?: ReadonlyArray<string>; // weaponIds équipées
 }
 
 /**

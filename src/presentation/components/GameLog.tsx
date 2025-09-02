@@ -6,7 +6,8 @@
 
 import React, { useEffect, useRef } from 'react';
 import type { NarrativeMessage, MessageType } from '../../domain/entities/NarrativeMessage';
-import { GameNarrativeService } from '../../domain/services/GameNarrativeService';
+import { DIContainer } from '../../infrastructure/container/DIContainer';
+import type { GameNarrativeService } from '../../domain/services/GameNarrativeService';
 
 interface GameLogProps {
   messages: NarrativeMessage[];
@@ -122,9 +123,10 @@ export const GameLog: React.FC<GameLogProps> = ({
  */
 export const useGameLog = () => {
   // Initialisation avec un message de bienvenue aléatoire
-  const [messages, setMessages] = React.useState<NarrativeMessage[]>(() => [
-    GameNarrativeService.createWelcomeMessage()
-  ]);
+  const [messages, setMessages] = React.useState<NarrativeMessage[]>(() => {
+    const gameNarrativeService = DIContainer.getInstance().get<GameNarrativeService>('GameNarrativeService');
+    return [gameNarrativeService.createWelcomeMessage()];
+  });
 
   const addMessage = React.useCallback((message: NarrativeMessage) => {
     setMessages(prev => [...prev, message]);

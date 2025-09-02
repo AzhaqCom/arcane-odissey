@@ -58,7 +58,11 @@ export interface DefensiveAssessment {
  */
 export class ThreatAssessment {
 
-  constructor(private readonly diceRollingService: DiceRollingService) {}
+  private diceRollingService: DiceRollingService;
+  
+  constructor(diceRollingService: DiceRollingService) {
+    this.diceRollingService = diceRollingService;
+  }
 
   /**
    * Analyser toutes les menaces pour une entité

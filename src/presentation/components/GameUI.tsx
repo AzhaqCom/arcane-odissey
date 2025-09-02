@@ -4,11 +4,10 @@
  */
 
 import React from 'react';
-import { GameSession, Character } from '../../domain/entities';
 import type { GameAction, GameStateSnapshot } from '../../application/usecases/GameUseCase';
 import { TimeDisplay } from './TimeDisplay';
 import { logger } from '../../infrastructure/services/Logger';
-import { UIStateUseCase } from '../../application/usecases/UIStateUseCase';
+import { useUIState } from '../hooks/useUIState';
 
 interface GameUIProps {
   gameState: GameStateSnapshot;
@@ -33,6 +32,9 @@ export const GameUI: React.FC<GameUIProps> = ({
 }) => {
   const [showMenu, setShowMenu] = React.useState(false);
   const [showCharacterSummary, setShowCharacterSummary] = React.useState(false);
+  
+  // CONSTITUTION #3 - UI utilise les hooks, pas directement les UseCases
+  const { getHealthDisplayData } = useUIState();
   
   const session = gameState.session;
   const player = session.playerCharacter;
@@ -82,8 +84,8 @@ export const GameUI: React.FC<GameUIProps> = ({
     }
   };
 
-  // Utiliser le Use Case pour les données d'affichage santé
-  const healthDisplayData = UIStateUseCase.getHealthDisplayData(player);
+  // CONSTITUTION #3 - Données d'affichage via hook
+  const healthDisplayData = getHealthDisplayData(player);
 
   return (
     <div className="game-ui">

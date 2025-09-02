@@ -14,12 +14,7 @@ const PROFICIENCY_BONUS_PER_LEVEL: Record<number, number> = {
   17: 6, 18: 6, 19: 6, 20: 6
 };
 
-const XP_FOR_LEVEL: Record<number, number> = {
-  1: 0, 2: 300, 3: 900, 4: 2700, 5: 6500,
-  6: 14000, 7: 23000, 8: 34000, 9: 48000, 10: 64000,
-  11: 85000, 12: 100000, 13: 120000, 14: 140000, 15: 165000,
-  16: 195000, 17: 225000, 18: 265000, 19: 305000, 20: 355000
-};
+// XP_FOR_LEVEL removed - unused constant
 
 export class Character {
   public readonly id: string;
@@ -33,6 +28,10 @@ export class Character {
   public readonly gold: number;
   public readonly position?: Position;
   public readonly inventory: InventorySpec;
+
+  // PHASE 1 - Propriétés manquantes pour la compilation
+  public readonly characterClass: string;
+  public readonly abilities: AbilityScores;
   
   public readonly currentHP: number;
   public readonly maxHP: number;
@@ -56,6 +55,10 @@ export class Character {
     this.position = props.position;
     this.inventory = props.inventory;
     this.currentHP = props.currentHP;
+
+    // PHASE 1 - Initialisation des propriétés manquantes
+    this.characterClass = classSpec.name || classSpec.id || this.classId;
+    this.abilities = props.baseStats; // Alias pour compatibilité
 
     // Calcul des stats dérivées
     this.maxHP = this.calculateMaxHp();
@@ -147,5 +150,46 @@ export class Character {
   
   heal(healAmount: number): Character {
     return this.withHP(this.currentHP + healAmount);
+  }
+
+  /**
+   * CONSTITUTION #1 - Logique métier dans le Domaine
+   * Méthodes de santé pures déplacées depuis UIStateUseCase
+   */
+  
+  get isAlive(): boolean {
+    return this.currentHP > 0;
+  }
+
+  get isDead(): boolean {
+    return this.currentHP <= 0;
+  }
+
+  getHealthPercentage(): number {
+    return Math.max(0, Math.min(100, (this.currentHP / this.maxHP) * 100));
+  }
+
+  getHealthStatus(): 'healthy' | 'wounded' | 'critical' | 'unconscious' {
+    if (this.currentHP <= 0) {
+      return 'unconscious';
+    }
+    
+    const percentage = this.getHealthPercentage();
+    if (percentage <= 25) {
+      return 'critical';
+    } else if (percentage <= 50) {
+      return 'wounded';
+    } else {
+      return 'healthy';
+    }
+  }
+
+  needsUrgentHealing(): boolean {
+    const status = this.getHealthStatus();
+    return status === 'critical' || status === 'unconscious';
+  }
+
+  formatHealthText(): string {
+    return `${this.currentHP}/${this.maxHP} HP`;
   }
 }

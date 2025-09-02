@@ -25,7 +25,7 @@ export class SceneRepository implements ISceneRepository {
   private _initialized = false;
 
   constructor() {
-    this.initialize();
+    // N'appellons pas initialize() ici - laissons les méthodes s'en charger
   }
 
   /**

@@ -7,7 +7,7 @@ import React from 'react';
 import { Scene, GameSession } from '../../domain/entities';
 import { Combat, type CombatEntity, type Position } from '../../domain/entities/Combat';
 import type { SceneAnalysis } from '../../application/usecases/SceneUseCase';
-import type { CombatPhase } from '../hooks/useCombat';
+// CombatPhase type not exported from useCombat - removing unused import
 import { CombatPanel } from './CombatPanel';
 import { CombatGrid } from './CombatGrid';
 import { GameLog, useGameLog } from './GameLog';

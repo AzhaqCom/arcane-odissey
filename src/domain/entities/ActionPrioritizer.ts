@@ -38,8 +38,11 @@ export type PriorityCriteria =
  * Service de classification et priorisation des actions disponibles
  */
 export class ActionPrioritizer {
+  private diceRollingService: DiceRollingService;
 
-  constructor(private readonly diceRollingService: DiceRollingService) {}
+  constructor(diceRollingService: DiceRollingService) {
+    this.diceRollingService = diceRollingService;
+  }
 
   /**
    * Prioriser toutes les actions disponibles pour une entité
@@ -53,16 +56,16 @@ export class ActionPrioritizer {
 
     // Analyser les actions de base
     entity.availableActions.forEach(action => {
-      const prioritized = this.evaluateAction(action, entity, context, criteria);
+      const prioritized = ActionPrioritizer.evaluateAction(action, entity, context, criteria);
       if (prioritized) availableActions.push(prioritized);
     });
 
     // Analyser les sorts
     entity.knownSpells.forEach(spell => {
-      const availableSlots = this.getAvailableSlots(entity, spell);
+      const availableSlots = ActionPrioritizer.getAvailableSlots(entity, spell);
       
-      availableSlots.forEach(level => {
-        const prioritized = this.evaluateSpell(spell, level, entity, context, criteria);
+      availableSlots.forEach((level: number) => {
+        const prioritized = ActionPrioritizer.evaluateSpell(spell, level, entity, context, criteria);
         if (prioritized) availableActions.push(prioritized);
       });
     });
@@ -276,13 +279,13 @@ export class ActionPrioritizer {
     return score;
   }
 
-  private static predictActionOutcome(
+  private predictActionOutcome(
     action: Action,
     entity: CombatEntity,
     target: CombatEntity | null,
     context: BehaviorContext
   ): ActionOutcome {
-    const abilityModifier = this.getAbilityModifier(entity, 'strength');
+    const abilityModifier = ActionPrioritizer.getAbilityModifier(entity, 'strength');
     
     let expectedDamage = 0;
     if (action.effects.damage && target) {
@@ -307,14 +310,14 @@ export class ActionPrioritizer {
     };
   }
 
-  private static predictSpellOutcome(
+  private predictSpellOutcome(
     spell: Spell,
     level: SpellLevel,
     entity: CombatEntity,
     target: CombatEntity | null,
     context: BehaviorContext
   ): ActionOutcome {
-    const spellcastingModifier = this.getSpellcastingModifier(entity);
+    const spellcastingModifier = ActionPrioritizer.getSpellcastingModifier(entity);
 
     let expectedDamage = 0;
     if (spell.effects.damage && target) {
@@ -517,9 +520,9 @@ export class ActionPrioritizer {
   ): number {
     let advantage = 50; // Base
 
-    if (action.type === 'dash' && !context.canReachEnemy) advantage += 30;
-    if (action.type === 'dodge' && context.isInDanger) advantage += 40;
-    if (action.type === 'hide' && context.hpPercentage < 0.4) advantage += 35;
+    if (_action.type === 'dash' && !context.canReachEnemy) advantage += 30;
+    if (_action.type === 'dodge' && context.isInDanger) advantage += 40;
+    if (_action.type === 'hide' && context.hpPercentage < 0.4) advantage += 35;
 
     return Math.max(0, Math.min(100, advantage));
   }

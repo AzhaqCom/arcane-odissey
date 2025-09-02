@@ -13,8 +13,11 @@ import type { DiceRollingService } from './DiceRollingService';
  * Refactorisé en service non-statique avec injection
  */
 export class GameNarrativeService {
+  private diceRollingService: DiceRollingService;
 
-  constructor(private readonly diceRollingService: DiceRollingService) {}
+  constructor(diceRollingService: DiceRollingService) {
+    this.diceRollingService = diceRollingService;
+  }
 
   // === COMBAT MESSAGES ===
 

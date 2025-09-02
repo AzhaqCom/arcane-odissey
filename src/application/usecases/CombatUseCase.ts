@@ -12,6 +12,8 @@ import { EnemyMapper } from '../mappers/EnemyMapper';
 import { DiceRollingService } from '../../domain/services/DiceRollingService';
 import { InitiativeService } from '../../domain/services/InitiativeService';
 import { DIContainer } from '../../infrastructure/container/DIContainer';
+import { logger } from '../../infrastructure/services/Logger';
+import type { SpellLevel } from '../../domain/entities/Spell';
 
 // On définit un type pour la "recette" d'ennemis venant de la scène
 export interface EnemyEncounter {
@@ -23,21 +25,29 @@ export interface EnemyEncounter {
 export class CombatUseCase {
   private readonly combatRepo: ICombatRepository;
   private readonly characterRepo: ICharacterRepository;
-  private readonly combatFactory: (id: string) => Combat;
-  // Repositories pour futures implémentations
-  // private readonly effectsRepo: IEffectsRepository;
-  // private readonly weaponRepo: IWeaponRepository;
+  private readonly combatFactory: (id: string, gridDimensions?: any) => Combat;
+  // PHASE 2 - Ajout services manquants pour injection
+  private readonly gameNarrativeService: GameNarrativeService;
+  private readonly diceRollingService: DiceRollingService;
+  private readonly initiativeService: InitiativeService;
 
   constructor(
     combatRepo: ICombatRepository,
     characterRepo: ICharacterRepository,
     gameNarrativeService: GameNarrativeService,
-    combatFactory: (id: string) => Combat,
+    diceRollingService: DiceRollingService,
+    initiativeService: InitiativeService,
+    combatFactory: (id: string, gridDimensions?: any) => Combat,
     _effectsRepo: IEffectsRepository,
     _weaponRepo: IWeaponRepository
   ) {
     this.combatRepo = combatRepo;
     this.characterRepo = characterRepo;
+    this.gameNarrativeService = gameNarrativeService;
+    
+    // PHASE 2 - Services injectés directement (pas via DIContainer pour éviter la boucle)
+    this.diceRollingService = diceRollingService;
+    this.initiativeService = initiativeService;
     this.combatFactory = combatFactory;
     // effectsRepo et weaponRepo seront utilisés dans futures implémentations
   }
@@ -52,14 +62,14 @@ export class CombatUseCase {
       const narrativeMessages: NarrativeMessage[] = [];
 
       // Message de début de combat généré par le Domain
-      narrativeMessages.push(GameNarrativeService.createCombatStartMessage());
+      narrativeMessages.push(this.gameNarrativeService.createCombatStartMessage());
 
       // --- JOUEURS ET COMPAGNONS ---
       for (const characterId of playerIds) {
         const character = await this.characterRepo.getById(characterId);
         if (!character) return { success: false, error: `Character ${characterId} not found` };
 
-        const initiativeRoll = Math.floor(Math.random() * 20) + 1;
+        const initiativeRoll = this.diceRollingService.rollD20();
         const initiative = initiativeRoll + character.getAbilityModifiers().dexterity;
 
         // Message d'initiative généré par le Domain
@@ -98,9 +108,9 @@ export class CombatUseCase {
           // Conversion via mapper
           const mappedData = EnemyMapper.infraToEnemySpec(enemyDataSource, enemyTemplate);
 
-          const initiativeRoll = DiceRollingService.rollD20();
+          const initiativeRoll = this.diceRollingService.rollD20();
           const dexModifier = 2; // TODO: récupérer le vrai modificateur de dextérité de l'ennemi
-          const initiative = InitiativeService.calculateInitiativeWithModifier(dexModifier);
+          const initiative = this.initiativeService.calculateInitiativeWithModifier(dexModifier);
 
           // Message d'initiative ennemi généré par le Domain
           narrativeMessages.push(
@@ -146,7 +156,7 @@ export class CombatUseCase {
     try {
       return await this.combatRepo.getCombat();
     } catch (error) {
-      logger.error('Failed to get current combat:', error);
+      logger.error('Failed to get current combat:', error instanceof Error ? error.message : String(error));
       return null;
     }
   }
@@ -184,7 +194,7 @@ export class CombatUseCase {
       await this.combatRepo.saveCombat(finalCombat);
       return { success: true, result, combat: finalCombat };
     } catch (error) {
-      logger.error('🚨 AI Turn error:', error);
+      logger.error('🚨 AI Turn error:', error instanceof Error ? error.message : String(error));
       return { success: false, error: (error as Error).message };
     }
   }

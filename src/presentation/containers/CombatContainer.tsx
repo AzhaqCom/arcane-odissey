@@ -39,6 +39,7 @@ export const CombatContainer: React.FC<CombatContainerProps> = ({
     reachableCells,
     spellValidations,
     weaponData,
+    formattedDamages,
     // Méthodes exposées par le hook
     executeAITurn,
     moveEntity,

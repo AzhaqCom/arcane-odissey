@@ -5,3 +5,4 @@
 
 export { useCombat } from './useCombat';
 export { useRepositories, useWeaponRepository, useSpellRepository, useCharacterRepository, useGameData } from './useRepositories';
+export { useUIState } from './useUIState';

@@ -32,8 +32,11 @@ export interface SpellCastingResult {
  * Toutes les méthodes retournent un nouvel objet Combat (immutabilité)
  */
 export class CombatActionService {
+  private diceRollingService: DiceRollingService;
 
-  constructor(private readonly diceRollingService: DiceRollingService) {}
+  constructor(diceRollingService: DiceRollingService) {
+    this.diceRollingService = diceRollingService;
+  }
 
   /**
    * Exécuter une action de combat

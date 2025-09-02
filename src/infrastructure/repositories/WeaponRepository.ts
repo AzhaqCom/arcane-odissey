@@ -22,8 +22,11 @@ export interface IWeaponRepository {
  * Convertit les WeaponData en entités Weapon du domain
  */
 export class WeaponRepository implements IWeaponRepository {
+  private gameDataStore: GameDataStore;
   
-  constructor(private gameDataStore: GameDataStore) {}
+  constructor(gameDataStore: GameDataStore) {
+    this.gameDataStore = gameDataStore;
+  }
   
   /**
    * Obtenir une arme par ID

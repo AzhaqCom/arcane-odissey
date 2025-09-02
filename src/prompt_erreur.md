@@ -8,7 +8,7 @@ Bonjour. Nous reprenons notre travail. La refactorisation architecturale est ter
 
   ---
 
-  Étape 1 : Le Diagnostic (Analyser les 296 erreurs)
+  Étape 1 : Le Diagnostic (Analyser les 287 erreurs)
 
    1. J'ai lancé npm run build > build_errors.log pour capturer toutes les erreurs dans un fichier.
    2. Ta première tâche est de lire et d'analyser ce fichier build_errors.log.

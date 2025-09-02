@@ -9,8 +9,11 @@ import type { Weapon } from '../entities/Weapon';
 import type { WeaponRepository } from '../repositories/WeaponRepository';
 
 export class EquipmentService {
+  private weaponRepository: WeaponRepository;
   
-  constructor(private weaponRepository: WeaponRepository) {}
+  constructor(weaponRepository: WeaponRepository) {
+    this.weaponRepository = weaponRepository;
+  }
 
   /**
    * Obtenir toutes les armes équipées d'un personnage
