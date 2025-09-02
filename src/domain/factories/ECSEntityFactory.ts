@@ -8,43 +8,11 @@ import { type CombatEntity, type Position } from '../entities/Combat';
 import { type ECSEntity, ECSEntityBuilder } from '../entities/ECS';
 import { SpellSlots } from '../entities/Spell';
 import type { EnemySpec, ActionsRemaining } from '../types';
+import type { DomainEnemyTemplate } from '../types/Enemy';
 import type { IWeaponRepository } from '../../infrastructure/repositories/WeaponRepository';
-
-// Interface temporaire pour la transition - mise à jour selon enemies.ts
-interface EnemyTemplate {
-  readonly id: string;
-  readonly name: string;
-  readonly level: number;
-  readonly baseAbilities: {
-    readonly strength: number;
-    readonly dexterity: number;
-    readonly constitution: number;
-    readonly intelligence: number;
-    readonly wisdom: number;
-    readonly charisma: number;
-  };
-  readonly maxHp: number;
-  readonly armorClass: number;
-  readonly speed: number;
-  readonly equipment: {
-    readonly weapons: readonly string[];
-    readonly armor?: readonly string[];
-    readonly items?: readonly string[];
-  };
-  readonly specialAbilities?: readonly string[];
-  readonly combatModifiers?: {
-    readonly attackBonus?: number;
-    readonly damageBonus?: number;
-    readonly resistances?: readonly string[];
-    readonly vulnerabilities?: readonly string[];
-  };
-  readonly aiProfile?: {
-    readonly behavior: 'aggressive' | 'defensive' | 'tactical' | 'cowardly';
-    readonly preferredRange: 'melee' | 'ranged' | 'mixed';
-    readonly aggroRadius?: number;
-  };
-  readonly lootTable?: ReadonlyArray<{ itemId: string; dropChance: number; }>;
-}
+import type { Weapon } from '../entities/Weapon';
+import { Action } from '../entities/Action';
+import type { Spell } from '../entities/Spell';
 
 /**
  * Factory ECS pour créer des entités de combat
@@ -97,8 +65,8 @@ export class ECSEntityFactory {
         equippedWeaponIds: []
       })
       .withSpells({
-        knownSpells: character.spells || [],
-        preparedSpells: character.preparedSpells || [],
+        knownSpells: [],  // TODO: Convertir character.knownSpells (string[]) vers Spell[]
+        preparedSpells: [...(character.preparedSpells || [])],
         spellSlots: character.spellSlots
       })
       .withPlayer({
@@ -112,7 +80,7 @@ export class ECSEntityFactory {
    * Créer une entité ECS à partir d'un template d'ennemi
    */
   static createFromEnemyTemplate(
-    template: EnemyTemplate,
+    template: DomainEnemyTemplate,
     instanceId: string,
     initiative: number,
     position: Position,
@@ -120,6 +88,7 @@ export class ECSEntityFactory {
     currentHp?: number
   ): ECSEntity {
     const proficiencyBonus = ECSEntityFactory.calculateProficiencyBonus(template.level);
+    const weapons = ECSEntityFactory.resolveEnemyWeapons(template, weaponRepository);
     
     return new ECSEntityBuilder(instanceId)
       .withStats({
@@ -143,7 +112,7 @@ export class ECSEntityFactory {
           bonusAction: true,
           reaction: true,
         } as ActionsRemaining,
-        availableActions: [] // TODO: Convertir template.actions vers Action[]
+        availableActions: ECSEntityFactory.generateActionsFromWeapons(weapons)
       })
       .withStatus({
         entityType: 'enemy',
@@ -152,8 +121,8 @@ export class ECSEntityFactory {
         conditions: []
       })
       .withWeapons({
-        weapons: [], // TODO: Résoudre template.actions vers Weapon[]
-        equippedWeaponIds: []
+        weapons: weapons,
+        equippedWeaponIds: weapons.map(w => w.id)
       })
       .withSpells({
         knownSpells: [],
@@ -161,8 +130,8 @@ export class ECSEntityFactory {
         spellSlots: new SpellSlots() // Ennemis de base sans sorts
       })
       .withAI({
-        behavior: ECSEntityFactory.inferBehaviorFromTemplate(template),
-        preferredRange: ECSEntityFactory.inferRangeFromActions(template.actions),
+        behavior: template.aiProfile?.behavior || ECSEntityFactory.inferBehaviorFromTemplate(template),
+        preferredRange: template.aiProfile?.preferredRange || ECSEntityFactory.inferRangeFromWeapons(weapons),
         aggroRadius: 10 // Par défaut
       })
       .build();
@@ -219,7 +188,12 @@ export class ECSEntityFactory {
       });
     }
 
-    // TODO: Ajouter WeaponsComponent quand inventory sera traité
+    // Ajouter les armes depuis l'inventaire
+    const weapons = combatEntity.inventory?.weapons || [];
+    builder.withWeapons({
+      weapons: weapons,
+      equippedWeapon: weapons.length > 0 ? weapons[0] : null
+    });
 
     return builder.build();
   }
@@ -243,7 +217,7 @@ export class ECSEntityFactory {
   /**
    * Inférer le comportement IA depuis un template
    */
-  private static inferBehaviorFromTemplate(template: EnemyTemplate): 'aggressive' | 'defensive' | 'tactical' | 'cowardly' {
+  private static inferBehaviorFromTemplate(template: DomainEnemyTemplate): 'aggressive' | 'defensive' | 'tactical' | 'cowardly' {
     // Logique simple basée sur le nom/niveau
     if (template.name.toLowerCase().includes('scout')) return 'tactical';
     if (template.name.toLowerCase().includes('berserker')) return 'aggressive';
@@ -253,15 +227,61 @@ export class ECSEntityFactory {
   }
 
   /**
-   * Inférer la portée préférée depuis les actions
+   * Résoudre les IDs d'armes d'un template vers des objets Weapon
    */
-  private static inferRangeFromActions(actions: readonly string[]): 'melee' | 'ranged' | 'mixed' {
-    const hasRanged = actions.some(action => 
-      action.includes('bow') || action.includes('crossbow') || action.includes('javelin')
+  private static resolveEnemyWeapons(template: DomainEnemyTemplate, weaponRepository: IWeaponRepository): Weapon[] {
+    const weapons: Weapon[] = [];
+    
+    for (const weaponId of template.equipment.weapons) {
+      try {
+        const weapon = weaponRepository.getWeapon(weaponId);
+        if (weapon) {
+          weapons.push(weapon);
+        }
+      } catch (error) {
+        console.warn(`Arme non trouvée: ${weaponId} pour ennemi ${template.name}`);
+      }
+    }
+    
+    return weapons;
+  }
+
+  /**
+   * Générer les actions disponibles à partir des armes
+   */
+  private static generateActionsFromWeapons(weapons: Weapon[]): Action[] {
+    const actions: Action[] = [];
+    
+    // Ajouter actions d'attaque pour chaque arme
+    for (const weapon of weapons) {
+      actions.push(new Action(
+        `attack_${weapon.id}`,
+        `Attaquer avec ${weapon.name}`,
+        'attack',
+        'action',
+        `Attaque avec ${weapon.name}`,
+        {
+          range: weapon.range?.normal || 5,
+          requiresTarget: true
+        }
+      ));
+    }
+    
+    // Ajouter actions universelles
+    actions.push(
+      new Action('dodge', 'Esquiver', 'dodge', 'action', 'Esquive pour augmenter sa CA'),
+      new Action('dash', 'Se précipiter', 'dash', 'action', 'Double sa vitesse de déplacement')
     );
-    const hasMelee = actions.some(action => 
-      action.includes('sword') || action.includes('dagger') || action.includes('claw')
-    );
+    
+    return actions;
+  }
+
+  /**
+   * Inférer la portée préférée depuis les armes
+   */
+  private static inferRangeFromWeapons(weapons: Weapon[]): 'melee' | 'ranged' | 'mixed' {
+    const hasRanged = weapons.some(weapon => weapon.category === 'ranged');
+    const hasMelee = weapons.some(weapon => weapon.category === 'melee');
 
     if (hasRanged && hasMelee) return 'mixed';
     if (hasRanged) return 'ranged';

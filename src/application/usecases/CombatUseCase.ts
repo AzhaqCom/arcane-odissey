@@ -11,6 +11,8 @@ import { type NarrativeMessage } from '../../domain/entities/NarrativeMessage';
 import { EnemyMapper } from '../mappers/EnemyMapper';
 import { DiceRollingService } from '../../domain/services/DiceRollingService';
 import { InitiativeService } from '../../domain/services/InitiativeService';
+import { CombatSession } from '../../domain/entities/CombatSession';
+import { CombatSessionFactory } from '../../domain/services/CombatSessionFactory';
 // DIContainer import retiré - services injectés via constructeur
 import { logger } from '../../infrastructure/services/Logger';
 import type { SpellLevel } from '../../domain/entities/Spell';
@@ -30,6 +32,8 @@ export class CombatUseCase {
   private readonly gameNarrativeService: GameNarrativeService;
   private readonly diceRollingService: DiceRollingService;
   private readonly initiativeService: InitiativeService;
+  // Combat Session Pattern
+  private readonly combatSessionFactory: CombatSessionFactory;
 
   constructor(
     combatRepo: ICombatRepository,
@@ -49,6 +53,16 @@ export class CombatUseCase {
     this.diceRollingService = diceRollingService;
     this.initiativeService = initiativeService;
     this.combatFactory = combatFactory;
+    
+    // Combat Session Factory
+    this.combatSessionFactory = new CombatSessionFactory(
+      characterRepo,
+      diceRollingService,
+      initiativeService,
+      gameNarrativeService,
+      combatFactory
+    );
+    
     // effectsRepo et weaponRepo seront utilisés dans futures implémentations
   }
 
@@ -162,6 +176,9 @@ export class CombatUseCase {
   }
 
   /**
+   * @deprecated Viole la Constitution Architecturale (Règle #2). 
+   * À supprimer lors du prochain nettoyage. Utiliser executeAutomaticAITurn() à la place.
+   * 
    * Exécuter un tour d'IA automatique
    */
   async executeAITurn(): Promise<{ success: boolean; result?: any; error?: string; combat?: Combat }> {
@@ -170,15 +187,8 @@ export class CombatUseCase {
       if (!combat) {
         return { success: false, error: 'No active combat' };
       }
-
-
-
       const result = combat.executeAITurn();
-
-
-
       if (!result) {
-
         return { success: false, error: 'No AI turn available (probably player turn)' };
       }
 
@@ -197,6 +207,36 @@ export class CombatUseCase {
       logger.error('🚨 AI Turn error:', error instanceof Error ? error.message : String(error));
       return { success: false, error: (error as Error).message };
     }
+  }
+
+  /**
+   * @deprecated Utiliser executeAutomaticAITurnSession() à la place
+   * Exécuter un tour IA complet automatique (mouvement + attaque)
+   * Respecte la Constitution Architecturale - Règle #2 : Pattern "3 lignes"
+   */
+  async executeAutomaticAITurn(): Promise<{ success: boolean; result?: CombatResult; error?: string; combat?: Combat }> {
+    const combat = await this.combatRepo.getCombat();                    // 1. Récupération état
+    if (!combat) return { success: false, error: 'No active combat' };
+
+    const result = combat.executeCompleteAITurn();                       // 2. Appel Domain
+    if (!result) return { success: false, error: 'No AI turn available' };
+
+    await this.combatRepo.saveCombat(result.newCombat);                  // 3. Sauvegarde
+    return { success: result.success, result, combat: result.newCombat, error: result.success ? undefined : result.message };
+  }
+
+  /**
+   * Exécuter un tour IA automatique via Combat Session Pattern
+   * Respecte la Constitution Architecturale - Règle #2 : Pattern "3 lignes"
+   */
+  async executeAutomaticAITurnSession(): Promise<{ success: boolean; session?: CombatSession; error?: string }> {
+    const session = await this.combatRepo.getActiveSession();           // 1. Récupération session
+    if (!session) return { success: false, error: 'No active combat session' };
+
+    const newSession = session.executeAutomaticAITurn();                // 2. Appel Domain (Aggregate)
+    await this.combatRepo.saveSession(newSession);                      // 3. Sauvegarde session
+    
+    return { success: true, session: newSession };
   }
 
   /**

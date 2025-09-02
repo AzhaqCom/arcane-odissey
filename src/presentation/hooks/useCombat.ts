@@ -19,6 +19,8 @@ interface LogEntry {
 }
 import type { CombatUseCase } from '../../application/usecases/CombatUseCase';
 import type { SpellLevel } from '../../domain/entities/Spell';
+import { CombatSession } from '../../domain/entities/CombatSession';
+import type { ICombatRepository } from '../../domain/repositories';
 
 export const useCombat = (sceneContent: CombatSceneContent) => {
   // PHASE 3 - Services depuis DIContainer
@@ -114,7 +116,7 @@ export const useCombat = (sceneContent: CombatSceneContent) => {
         const enemyEncounters = EncounterMapper.sceneContentToEnemyEncounters(sceneContent);
         const initialPositions = EncounterMapper.getPlayerInitialPositions(sceneContent);
         
-        // Utiliser le CombatUseCase existant pour l'initialisation
+        // Utiliser le CombatUseCase existant pour l'initialisation (legacy)
         const result = await combatUseCase.initiateCombat(
           playerIds,
           enemyEncounters,
@@ -124,6 +126,18 @@ export const useCombat = (sceneContent: CombatSceneContent) => {
         if (result.success && result.combat) {
           setCombat(result.combat);
           addLog('success', `Combat initialisé avec ${result.combat.entities.size} entités`);
+          
+          // MIGRATION : Créer une session pour le nouveau système
+          console.log('🔄 useCombat: Creating session from existing combat');
+          try {
+            const session = CombatSession.create(result.combat);
+            const repo = DIContainer.getInstance().get<ICombatRepository>('CombatRepository');
+            await repo.saveSession(session);
+            console.log('✅ useCombat: Session created and saved');
+          } catch (sessionError) {
+            console.error('❌ useCombat: Failed to create session', sessionError);
+          }
+          
         } else {
           throw new Error(result.error || 'Erreur lors de l\'initialisation du combat'); 
         }
@@ -242,6 +256,7 @@ export const useCombat = (sceneContent: CombatSceneContent) => {
   }, [combat]);
 
   /**
+   * @deprecated Utiliser triggerAutomaticAITurn() à la place
    * Exécuter un tour d'IA - DÉLÉGATION VERS LE DOMAINE
    */
   const executeAITurn = useCallback(async () => {
@@ -268,6 +283,45 @@ export const useCombat = (sceneContent: CombatSceneContent) => {
       setError(errorMessage);
     }
   }, [combat]);
+
+  /**
+   * Déclencher un tour IA complet automatique (mouvement + attaque)
+   * Respecte la Constitution Architecturale - Règle #3 : Présentation via Hook
+   * Version Session Pattern (nouvelle)
+   */
+  const triggerAutomaticAITurn = useCallback(async () => {
+    if (!combat) {
+      console.log('❌ useCombat: No combat available for AI turn');
+      return null;
+    }
+    
+    const currentBeforeCall = combat.getCurrentEntity();
+    console.log('🎯 useCombat: triggerAutomaticAITurn called for', currentBeforeCall?.name, 'type:', currentBeforeCall?.type);
+    
+    try {
+      // Utiliser la nouvelle méthode Session Pattern
+      const result = await combatUseCase.executeAutomaticAITurnSession();
+      console.log('📊 useCombat: AI turn session result', result);
+      
+      // Mise à jour de l'état React depuis la session
+      if (result.session) {
+        setCombat(result.session.combat);
+      }
+      
+      // Log de l'action avec détails
+      const logType = result.success ? 'success' : 'error';
+      const message = result.error || 'Tour IA automatique terminé (Session Pattern)';
+      
+      addLog(logType, message);
+      
+      return result;
+    } catch (err) {
+      console.error('❌ useCombat: Error in triggerAutomaticAITurn', err);
+      const errorMessage = err instanceof Error ? err.message : 'Erreur lors du tour IA automatique';
+      addLog('error', errorMessage);
+      setError(errorMessage);
+    }
+  }, [combat, combatUseCase]);
 
   // === FONCTIONS UTILITAIRES PURES ===
 
@@ -351,7 +405,8 @@ export const useCombat = (sceneContent: CombatSceneContent) => {
     castSpell,
     moveEntity,
     advanceToNextEntity,
-    executeAITurn,
+    executeAITurn, // @deprecated
+    triggerAutomaticAITurn,
     
     // Utilitaires
     addLog,

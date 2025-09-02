@@ -468,6 +468,137 @@ export class Combat {
   }
 
   /**
+   * Exécuter un tour IA complet (mouvement + attaque automatiques)
+   * Respecte la Constitution Architecturale - Règle #1 : Domain-Centric
+   */
+  executeCompleteAITurn(): CombatResult | null {
+    const currentEntity = this.getCurrentEntity();
+    console.log('🧠 Combat: executeCompleteAITurn called for', currentEntity?.name, 'type:', currentEntity?.type);
+    
+    if (!currentEntity || currentEntity.type === 'player') {
+      console.log('❌ Combat: Not an AI entity, aborting');
+      return {
+        newCombat: this,
+        success: false,
+        message: 'Pas d\'entité IA active pour jouer automatiquement'
+      };
+    }
+
+    try {
+      console.log('⚡ Combat: Executing AI action phase');
+      // Phase 1: Exécuter l'action IA (attaque/sort/dodge/dash)
+      const aiActionResult = this.executeAITurn();
+      console.log('📊 Combat: AI action result', aiActionResult);
+      
+      if (!aiActionResult || !aiActionResult.valid) {
+        console.log('❌ Combat: AI action failed');
+        return {
+          newCombat: this,
+          success: false,
+          message: `Tour IA échoué: ${aiActionResult?.reasons?.join(', ') || 'Aucune action disponible'}`
+        };
+      }
+
+      // Phase 2: Mouvement intelligent si l'IA n'a pas utilisé dash et a encore du mouvement
+      let updatedCombat = this;
+      const entityAfterAction = updatedCombat.getCurrentEntity();
+      
+      console.log('🏃 Combat: Checking movement phase for', entityAfterAction?.name);
+      if (entityAfterAction && entityAfterAction.actionsRemaining.movement > 0) {
+        console.log('🎯 Combat: Entity has movement remaining, calculating best position');
+        // Logique de mouvement intelligent (repositionnement tactique)
+        const bestPosition = this.calculateBestAIPosition(entityAfterAction.id);
+        if (bestPosition && (bestPosition.x !== entityAfterAction.position.x || bestPosition.y !== entityAfterAction.position.y)) {
+          console.log('🚶 Combat: Moving to position', bestPosition);
+          const movementResult = updatedCombat.executeMovement(entityAfterAction.id, bestPosition);
+          if (movementResult.success) {
+            updatedCombat = movementResult.newCombat;
+          }
+        }
+      }
+
+      // Phase 3: Avancer au tour suivant automatiquement
+      console.log('⏭️ Combat: Advancing to next turn');
+      const finalCombat = updatedCombat.withAdvancedTurn().withCheckedCombatEnd();
+
+      console.log('✅ Combat: AI turn completed successfully');
+      return {
+        newCombat: finalCombat,
+        success: true,
+        message: `${currentEntity.name} a joué son tour complet automatiquement`,
+        damage: aiActionResult.damage,
+        healing: aiActionResult.healing
+      };
+
+    } catch (error) {
+      console.error('❌ Combat: Error in executeCompleteAITurn', error);
+      return {
+        newCombat: this,
+        success: false,
+        message: `Erreur lors du tour IA: ${error instanceof Error ? error.message : String(error)}`
+      };
+    }
+  }
+
+  /**
+   * Calculer la meilleure position tactique pour une IA
+   * Logique métier Domain - Règle #1
+   */
+  private calculateBestAIPosition(entityId: string): Position | null {
+    const entity = this.entities.get(entityId);
+    if (!entity) return null;
+
+    // Simple heuristique: se rapprocher des ennemis si melee, garder distance si ranged
+    const enemyEntities = Array.from(this.entities.values()).filter(e => 
+      e.type !== entity.type && !e.isDead
+    );
+
+    if (enemyEntities.length === 0) return null;
+
+    const currentPos = entity.position;
+    const availablePositions = this.getReachableCells(entityId);
+    
+    if (availablePositions.length === 0) return null;
+
+    // Heuristique basique: trouver position optimale selon type d'entité
+    let bestScore = -Infinity;
+    let bestPosition: Position | null = null;
+
+    for (const pos of availablePositions) {
+      let score = 0;
+      
+      // Calculer score basé sur distance aux ennemis
+      for (const enemy of enemyEntities) {
+        const distance = Math.abs(pos.x - enemy.position.x) + Math.abs(pos.y - enemy.position.y);
+        
+        // Si l'IA a des armes de mêlée, privilégier proximité
+        if (entity.inventory?.weapons?.some(w => this.isWeaponMelee(w))) {
+          score += distance <= 1 ? 10 : -distance; // Bonus proximité
+        } else {
+          // Si ranged, maintenir distance optimale (2-4 cases)
+          score += (distance >= 2 && distance <= 4) ? 5 : -Math.abs(distance - 3);
+        }
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestPosition = pos;
+      }
+    }
+
+    return bestPosition;
+  }
+
+  /**
+   * Helper pour déterminer si une arme est de mêlée
+   */
+  private isWeaponMelee(weaponId: string): boolean {
+    // TODO: Intégrer avec WeaponRepository pour vraie vérification
+    // Pour l'instant, simple heuristique basée sur le nom
+    return !['shortbow', 'longbow', 'crossbow', 'sling'].includes(weaponId);
+  }
+
+  /**
    * Obtenir l'analyse des menaces pour une entité
    */
   getThreatAnalysis(entityId: string, targetId: string) {

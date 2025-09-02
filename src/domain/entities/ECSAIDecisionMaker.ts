@@ -288,9 +288,21 @@ export class ECSAIDecisionMaker {
           return currentDist < nearestDist ? current : nearest;
         });
         
+        // Sélectionner la meilleure arme pour cette intention
+        const weaponId = this.selectBestWeapon(context.entity, decision.intent);
+        
         return {
           ...decision,
-          targetEntityId: nearestEnemy.id
+          targetEntityId: nearestEnemy.id,
+          weaponId: weaponId
+        };
+
+      case 'dodge':
+      case 'dash':
+        // Actions universelles : pas d'arme ni de cible
+        return {
+          ...decision,
+          weaponId: null
         };
 
       default:
@@ -329,7 +341,65 @@ export class ECSAIDecisionMaker {
 
   private hasRangedOptionsECS(entity: ECSEntity): boolean {
     const weapons = ECSUtils.getComponent<WeaponsComponent>(entity, 'weapons');
-    return weapons?.weapons.some(weapon => weapon.range && weapon.range > 1) || false;
+    return weapons?.weapons.some(weapon => weapon.category === 'ranged') || false;
+  }
+
+  /**
+   * Sélectionner la meilleure arme selon l'intention
+   */
+  private selectBestWeapon(entity: ECSEntity, intent: ActionIntent): string | null {
+    const weapons = ECSUtils.getComponent<WeaponsComponent>(entity, 'weapons');
+    if (!weapons || weapons.weapons.length === 0) return null;
+
+    switch (intent) {
+      case 'attack_melee':
+        // Chercher arme corps à corps la plus puissante
+        const meleeWeapons = weapons.weapons.filter(w => w.category === 'melee');
+        if (meleeWeapons.length === 0) return null;
+        
+        return meleeWeapons.reduce((best, current) => {
+          const bestDamage = this.calculateWeaponDamageAverage(best);
+          const currentDamage = this.calculateWeaponDamageAverage(current);
+          return currentDamage > bestDamage ? current : best;
+        }).id;
+
+      case 'attack_ranged':
+        // Chercher arme à distance avec meilleure portée
+        const rangedWeapons = weapons.weapons.filter(w => w.category === 'ranged');
+        if (rangedWeapons.length === 0) return null;
+        
+        return rangedWeapons.reduce((best, current) => {
+          const bestRange = best.range?.normal || 0;
+          const currentRange = current.range?.normal || 0;
+          // Prioriser portée, puis dégâts en cas d'égalité
+          if (currentRange > bestRange) return current;
+          if (currentRange === bestRange) {
+            const bestDamage = this.calculateWeaponDamageAverage(best);
+            const currentDamage = this.calculateWeaponDamageAverage(current);
+            return currentDamage > bestDamage ? current : best;
+          }
+          return best;
+        }).id;
+
+      default:
+        // Pour actions universelles, pas d'arme nécessaire
+        return null;
+    }
+  }
+
+  /**
+   * Calculer les dégâts moyens d'une arme
+   */
+  private calculateWeaponDamageAverage(weapon: any): number {
+    // Parse dice string (ex: "1d8" -> 1 * (8+1)/2 = 4.5)
+    const diceMatch = weapon.damage?.dice?.match(/(\d+)d(\d+)/);
+    if (!diceMatch) return 1;
+    
+    const diceCount = parseInt(diceMatch[1]);
+    const diceType = parseInt(diceMatch[2]);
+    const averagePerDice = (diceType + 1) / 2;
+    
+    return diceCount * averagePerDice + (weapon.damage?.bonus || 0);
   }
 
   private hasSpellsECS(entity: ECSEntity): boolean {

@@ -32,7 +32,23 @@ export interface DomainEnemyTemplate {
   readonly resistances?: readonly string[];
   readonly vulnerabilities?: readonly string[];
   readonly immunities?: readonly string[];
-  readonly actions: readonly string[];
+  readonly equipment: {
+    readonly weapons: readonly string[];
+    readonly armor?: readonly string[];
+    readonly items?: readonly string[];
+  };
+  readonly specialAbilities?: readonly string[];
+  readonly combatModifiers?: {
+    readonly attackBonus?: number;
+    readonly damageBonus?: number;
+    readonly resistances?: readonly string[];
+    readonly vulnerabilities?: readonly string[];
+  };
+  readonly aiProfile?: {
+    readonly behavior: 'aggressive' | 'defensive' | 'tactical' | 'cowardly';
+    readonly preferredRange: 'melee' | 'ranged' | 'mixed';
+    readonly aggroRadius?: number;
+  };
   readonly lootTable?: ReadonlyArray<{
     readonly itemId: string;
     readonly dropChance: number;

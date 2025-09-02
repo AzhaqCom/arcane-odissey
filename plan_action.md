@@ -24,14 +24,14 @@
   - Ajouter armes manquantes dans weapons.ts (scimitar, battleaxe, handaxe)
 
 ### ÉTAPE 1.2 : Factory ECS avec armes réelles (45min)
-- [ ] **Action** : Modifier `src/domain/factories/ECSEntityFactory.ts`
+- [x] **Action** : Modifier `src/domain/factories/ECSEntityFactory.ts`
   - Intégrer `WeaponRepository` dans la factory
   - Méthode `resolveEnemyWeapons(templateId)` pour charger armes depuis equipment
   - Remplacer `weapons: []` par armes réelles dans `WeaponsComponent`
   - Mettre à jour `availableActions` avec actions d'armes
 
 ### ÉTAPE 1.3 : AI Selection d'armes intelligente (1h)
-- [ ] **Action** : Améliorer `src/domain/entities/ECSAIDecisionMaker.ts`
+- [x] **Action** : Améliorer `src/domain/entities/ECSAIDecisionMaker.ts`
   - Méthode `selectBestWeapon(entity, intent)` 
     - Si `attack_melee` → chercher arme `type: 'melee'`
     - Si `attack_ranged` → chercher arme `type: 'ranged'`
@@ -39,7 +39,7 @@
   - Gérer actions universelles (dodge, dash) sans arme
 
 ### ÉTAPE 1.4 : Exécution attaques réelles IA (30min) 
-- [ ] **Action** : Modifier `src/domain/adapters/CombatECSAdapter.ts`
+- [x] **Action** : Modifier `src/domain/adapters/CombatECSAdapter.ts`
   - Dans `executeAITurnECS()` : utiliser `combat.performWeaponAttack()`
   - Passer `weaponId` depuis la décision IA
   - Supprimer simulation `Math.random() * 8 + 1`
@@ -181,4 +181,4 @@
 ---
 
 *Dernière mise à jour : Septembre 2025*
-*Status : Prêt pour PHASE 1*
+*Status : Prêt pour PHASE 1* dzdz 

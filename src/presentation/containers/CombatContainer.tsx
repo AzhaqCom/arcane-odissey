@@ -41,7 +41,8 @@ export const CombatContainer: React.FC<CombatContainerProps> = ({
     weaponData,
     formattedDamages,
     // Méthodes exposées par le hook
-    executeAITurn,
+    executeAITurn, // @deprecated
+    triggerAutomaticAITurn,
     moveEntity,
     performWeaponAttack,
     castSpell,
@@ -178,9 +179,12 @@ export const CombatContainer: React.FC<CombatContainerProps> = ({
         
         handleCombatAction({ type: 'advance_turn' });
       },
-      onExecuteAITurn: () => {
+      onExecuteAITurn: () => { // @deprecated
         
         handleCombatAction({ type: 'execute_ai_turn' });
+      },
+      onTriggerAutomaticAITurn: () => {
+        triggerAutomaticAITurn();
       },
       onMoveEntity: () => {
         

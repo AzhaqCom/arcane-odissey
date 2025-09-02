@@ -30,12 +30,32 @@ import { ThreatAssessment } from '../../domain/entities/ThreatAssessment';
 import { CombatActionService } from '../../domain/services/CombatActionService';
 import type { IRandomNumberGenerator } from '../../domain/services/DiceRollingService';
 import { Combat } from '../../domain/entities/Combat';
+import { CombatSession } from '../../domain/entities/CombatSession';
 
 // Création d'un CombatRepository temporaire (en attendant implémentation propre)
 class TempCombatRepository {
   private currentCombat: any = null;
+  private currentSession: CombatSession | null = null;
+
+  // Legacy methods
   async getCombat() { return this.currentCombat; }
   async saveCombat(combat: any) { this.currentCombat = combat; }
+
+  // New session methods
+  async getActiveSession(): Promise<CombatSession | null> { 
+    return this.currentSession; 
+  }
+  
+  async saveSession(session: CombatSession): Promise<void> { 
+    this.currentSession = session;
+    // Maintenir compatibilité legacy
+    this.currentCombat = session.combat;
+  }
+  
+  async endActiveSession(): Promise<void> { 
+    this.currentSession = null;
+    this.currentCombat = null;
+  }
 }
 
 // Création d'un EffectsRepository temporaire

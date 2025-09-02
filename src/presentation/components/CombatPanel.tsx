@@ -3,7 +3,7 @@
  * Panel contextuel pour les actions de combat
  */
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { type CombatEntity, Combat } from '../../domain/entities/Combat';
 import { type Weapon } from '../../domain/entities/Weapon';
 import { type Spell } from '../../domain/entities/Spell';
@@ -29,7 +29,8 @@ interface CombatPanelProps {
   formattedDamages: Map<string, string>;
   onStartCombat: () => void;
   onAdvanceTurn: () => void;
-  onExecuteAITurn: () => void;
+  onExecuteAITurn: () => void; // @deprecated
+  onTriggerAutomaticAITurn: () => void;
   onMoveEntity: () => void;
   onAttackWithWeapon: (weaponId: string) => void;
   onCastSpell: (spellId: string) => void;
@@ -50,12 +51,60 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
   formattedDamages,
   onStartCombat,
   onAdvanceTurn,
-  onExecuteAITurn,
+  onExecuteAITurn, // @deprecated
+  onTriggerAutomaticAITurn,
   onMoveEntity,
   onAttackWithWeapon,
   onCastSpell,
   onCancelTargeting
 }) => {
+  // Garde-fou contre les boucles infinies
+  const aiTurnAttempted = useRef<string | null>(null);
+  
+  /**
+   * Automatisation des tours IA - Respecte la Constitution Architecturale
+   * Règle #3 : Présentation Ignorante - détecte simplement le changement d'état
+   */
+  useEffect(() => {
+    console.log('🤖 CombatPanel: AI automation check', {
+      currentEntity: currentEntity?.name,
+      type: currentEntity?.type,
+      isPlayerTurn,
+      phase
+    });
+
+    // Auto-déclencher tour IA quand c'est le tour d'un ennemi
+    if (currentEntity && currentEntity.type === 'enemy' && !isPlayerTurn && phase === 'ai_turn') {
+      // Garde-fou : ne pas réessayer pour la même entité
+      if (aiTurnAttempted.current === currentEntity.id) {
+        console.log('⚠️ CombatPanel: AI turn already attempted for', currentEntity.name, 'skipping');
+        return;
+      }
+
+      console.log('🎯 CombatPanel: Triggering AI turn for', currentEntity.name);
+      
+      // Délai réduit et garde-fou dans timeout
+      const timeoutId = setTimeout(() => {
+        // Double vérification que c'est toujours le même ennemi
+        if (aiTurnAttempted.current === currentEntity.id) {
+          console.log('⚠️ CombatPanel: AI turn already attempted during timeout for', currentEntity.name, 'skipping');
+          return;
+        }
+        
+        aiTurnAttempted.current = currentEntity.id; // Marquer JUSTE avant l'exécution
+        
+        console.log('🚀 CombatPanel: Executing automatic AI turn');
+        console.log('🔗 CombatPanel: onTriggerAutomaticAITurn function:', typeof onTriggerAutomaticAITurn);
+        onTriggerAutomaticAITurn();
+        console.log('✅ CombatPanel: onTriggerAutomaticAITurn called successfully');
+      }, 500); // Délai réduit à 500ms
+
+      return () => clearTimeout(timeoutId);
+    } else {
+      // Reset du garde-fou quand ce n'est plus un tour IA
+      aiTurnAttempted.current = null;
+    }
+  }, [currentEntity?.id, currentEntity?.type, isPlayerTurn, phase, onTriggerAutomaticAITurn]);
   
   const renderPreCombat = () => (
     <div style={{ textAlign: 'center', padding: '20px' }}>

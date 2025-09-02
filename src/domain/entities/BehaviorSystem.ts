@@ -42,6 +42,7 @@ export interface ActionDecision {
   readonly spellLevel?: SpellLevel;
   readonly targetEntityId?: string;
   readonly targetPosition?: GridPosition;
+  readonly weaponId?: string | null; // ID de l'arme à utiliser pour les attaques
   readonly priority: number;
   readonly confidence: number;
   readonly reasoning: string;
