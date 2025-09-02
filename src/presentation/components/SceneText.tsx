@@ -144,7 +144,6 @@ export const SceneText: React.FC<SceneTextProps> = ({
       {/* Choix disponibles */}
       {sceneAnalysis.availableChoices.length > 0 && (
         <div className="scene-choices">
-          <h3>Que voulez-vous faire ?</h3>
           <div className="choices-list">
             {sceneAnalysis.availableChoices.map((choice) => (
               <button

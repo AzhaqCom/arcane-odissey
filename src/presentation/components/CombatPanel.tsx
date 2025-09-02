@@ -128,7 +128,7 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
               <span>{targetingWeaponData.name} sélectionné (0/1 cibles)</span>
             )}
             {targetingSpellData && (
-              <span>{targetingSpellData.name} sélectionné (0/{targetingSpellData.targetCount || 1} cibles)</span>
+              <span>{targetingSpellData.name} sélectionné (0/1 cibles)</span>
             )}
           </div>
         )}
@@ -195,8 +195,8 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
         <div style={{ marginBottom: '20px' }}>
           <h4 style={{ marginBottom: '10px', color: '#555' }}>✨ Sorts</h4>
           {spells.map(spell => {
-            // PHASE 2 - ACTION 2.2.2: Utiliser validation depuis props
-            const validation = spellValidations.get(spell.id);
+            // PHASE 2 - ACTION 2.2.2: Utiliser validation depuis props avec défaut sécurisé
+            const validation = spellValidations.get(spell.id) || { canCast: false, hasSlot: false, hasAction: false, reason: 'Validation non trouvée' };
             
             return (
               <button
@@ -208,7 +208,7 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
                   padding: '10px',
                   marginBottom: '6px',
                   fontSize: '14px',
-                  backgroundColor: (canCast && hasAction) ? '#7b1fa2' : '#ccc',
+                  backgroundColor: (validation.canCast && validation.hasAction) ? '#7b1fa2' : '#ccc',
                   color: 'white',
                   border: 'none',
                   borderRadius: '4px',

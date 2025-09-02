@@ -33,22 +33,4 @@
 
   ---
 
-  REPRISE DE LA MISSION ACTUELLE
-
-  Nous avons été interrompus par la limite de temps. Nous reprenons exactement là où nous nous sommes arrêtés.
-
-  Contexte de la mission :
-  À la fin de la refactorisation, tu as produit un "Rapport de Conformité Final". Ce rapport a révélé que 2 critères sur 15
-  n'étaient pas respectés :
-   1. Purification du Domaine (Phase 3) : Des appels à Math.random() subsistaient.
-   2. Présentation Stupide (Phase 2 des criteres de validation de plan_archi.md) : Des composants React importaient directement des UseCases.
-
-  La tâche n°1 (Purification du Domaine) a été entièrement corrigée lors de notre dernière session. Il ne reste plus que la
-  seconde violation à corriger pour atteindre 100% de conformité architecturale.
-
-  Ta mission immédiate est donc de corriger cette dernière non-conformité : "Rendre la Présentation 100% Stupide".
-
-   * Objectif : Éliminer tous les imports directs de UseCase dans les composants React, comme tu l'as identifié dans ton
-     rapport (ex: dans GameUI.tsx).
-   * Première Étape : Fournis-moi le plan d'implémentation détaillé pour cette mission. Analyse les composants fautifs et
-     propose une solution claire pour que toute la logique passe par les hooks appropriés.
+ 

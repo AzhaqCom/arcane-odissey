@@ -53,6 +53,11 @@
 }
 
 /* === GAME LOG ENTRIES === */
+.game-log{
+  background: var(--secondary-bg);
+  padding: var(--spacing-sm);
+  border-radius: var(--spacing-sm);
+}
 .game-log-entry {
   padding: var(--spacing-sm) 0;
   border-bottom: 1px solid rgba(71, 85, 105, 0.3);

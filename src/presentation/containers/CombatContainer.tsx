@@ -110,7 +110,7 @@ export const CombatContainer: React.FC<CombatContainerProps> = ({
       }
     } catch (error) {
   
-      logger.error('❌ Error in handleCombatAction:', error);
+      logger.error('❌ Error in handleCombatAction:', error instanceof Error ? error.message : String(error));
       logger.ui('Error in combat action', { action, error });
     }
   };

@@ -170,10 +170,7 @@ export class Scene {
       return true;
     });
 
-    this._logger.game(`Available choices calculated: ${this._id}`, {
-      total: this._choices.length,
-      available: availableChoices.length
-    });
+
 
     return availableChoices;
   }

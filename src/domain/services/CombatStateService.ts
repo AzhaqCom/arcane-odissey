@@ -4,7 +4,7 @@
  * Responsabilité : Fournir une interface de mutations d'état (CQRS - Command side)
  */
 
-import type { Combat, CombatEntity, CombatPhase, TurnPhase } from '../entities/Combat';
+import type { Combat, CombatEntity, CombatPhase, TurnPhase, CombatDependencies } from '../entities/Combat';
 import type { Position } from '../types';
 import type { TacticalGrid } from '../entities/TacticalGrid';
 
@@ -202,7 +202,7 @@ export class CombatStateService {
     tacticalGrid: TacticalGrid;
   }> = {}): Combat {
     // Créer une nouvelle instance Combat
-    const newCombat = new (combat.constructor as any)(combat.id, { width: 12, height: 8 });
+    const newCombat = new (combat.constructor as any)(combat.id, { width: 12, height: 8 },combat.dependencies);
     
     // Copie des propriétés (structural sharing quand possible)
     (newCombat as any)._entities = modifications.entities || new Map(combat.entities);

@@ -93,5 +93,42 @@ export const WEAPONS_DATA: readonly WeaponData[] = [
     description: 'Un arc d\'une grande précision, fabriqué à partir du bois d\'un arbre ancien.',
     rarity: 'Légendaire',
     weight: 3
+  },
+  {
+    id: 'scimitar',
+    name: 'Cimeterre',
+    category: 'melee',
+    damage: { dice: '1d6', bonus: 0, type: 'dexterity' },
+    damageType: 'slashing',
+    properties: ['finesse', 'light'],
+    stat: 'dexterity',
+    description: 'Une épée courbée et élégante, idéale pour les combats agiles',
+    rarity: 'Commun',
+    weight: 3
+  },
+  {
+    id: 'battleaxe',
+    name: 'Hache de guerre',
+    category: 'melee',
+    damage: { dice: '1d8', bonus: 0, type: 'strength' },
+    damageType: 'slashing',
+    properties: ['versatile'],
+    stat: 'strength',
+    description: 'Une hache lourde à une main, dévastatrice au combat',
+    rarity: 'Commun',
+    weight: 4
+  },
+  {
+    id: 'handaxe',
+    name: 'Hachette',
+    category: 'melee',
+    damage: { dice: '1d6', bonus: 0, type: 'strength' },
+    damageType: 'slashing',
+    properties: ['light', 'thrown'],
+    range: { normal: 4, max: 12 }, // Pour lancer
+    stat: 'strength',
+    description: 'Petite hache légère, peut être lancée ou utilisée au corps à corps',
+    rarity: 'Commun',
+    weight: 2
   }
 ] as const;

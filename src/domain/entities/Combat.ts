@@ -15,6 +15,7 @@ import { CombatStateService } from '../services/CombatStateService';
 import { CombatActionService } from '../services/CombatActionService';
 import { AbilityCalculationService } from '../services/AbilityCalculationService';
 import { CombatAIService } from '../services/CombatAIService';
+import { CombatECSAdapter } from '../adapters/CombatECSAdapter';
 import type { DiceRollingService } from '../services/DiceRollingService';
 import type { DamageCalculationService } from '../services/DamageCalculationService';
 // Removed duplicate import
@@ -96,6 +97,9 @@ export interface CombatEntity {
   isDead: boolean;
   conditions: string[];
   concentratingOn?: string; // ID du sort de concentration actuel
+
+  // MIGRATION ECS - Support hybride
+  readonly ecsEntity?: import('./ECS').ECSEntity;
 }
 
 import type { DomainCombatPhase } from '../types';
@@ -123,6 +127,7 @@ export class Combat {
   private readonly _stateService: CombatStateService;
   private readonly _actionService: CombatActionService;
   private readonly _aiService: CombatAIService;
+  private readonly _ecsAdapter: CombatECSAdapter;
 
   private readonly dependencies: CombatDependencies;
 
@@ -131,6 +136,7 @@ export class Combat {
     gridDimensions: GridDimensions = { width: 12, height: 8 },
     dependencies: CombatDependencies
   ) {
+
     this.dependencies = dependencies;
     this._id = id;
     this._tacticalGrid = new TacticalGrid(gridDimensions);
@@ -151,8 +157,11 @@ export class Combat {
       actionService: this._actionService,
       aiDecisionMaker: this._aiDecisionMaker,
       threatAssessment: this._threatAssessment,
-      actionPrioritizer: new ActionPrioritizer(dependencies.diceRollingService)
+      actionPrioritizer: ActionPrioritizer
     });
+
+    // ECS Adapter pour migration progressive
+    this._ecsAdapter = new CombatECSAdapter();
   }
   
   /**
@@ -433,19 +442,29 @@ export class Combat {
   // AI SYSTEM INTEGRATION
 
   /**
-   * Exécuter un tour d'IA pour l'entité courante
+   * Exécuter un tour d'IA pour l'entité courante - VERSION ECS
    */
   executeAITurn(): ValidationResult & { damage?: number; healing?: number } | null {
-    const result = this._aiService.executeAITurn(this);
-    if (!result) return null;
+    const currentEntity = this.getCurrentEntity();
+    if (!currentEntity || currentEntity.type === 'player') return null;
+
+    // Utiliser ECS AI Decision Maker pour de meilleurs résultats
+    const result = this._ecsAdapter.executeAITurnECS(this, currentEntity.id);
     
-    // Adapter le format de retour du service vers l'interface legacy
-    return {
-      valid: result.success,
-      reasons: result.reasons || [],
-      damage: result.damage,
-      healing: result.healing
-    };
+    // Si pas de résultat ECS, fallback sur ancien système
+    if (!result) {
+      const fallbackResult = this._aiService.executeAITurn(this);
+      if (!fallbackResult) return null;
+      
+      return {
+        valid: fallbackResult.success,
+        reasons: fallbackResult.reasons ? [...fallbackResult.reasons] : [],
+        damage: fallbackResult.damage,
+        healing: fallbackResult.healing
+      };
+    }
+
+    return result;
   }
 
   /**
@@ -530,6 +549,13 @@ export class Combat {
   }
 
   /**
+   * Retourne un nouveau Combat avec le tour avancé à l'entité suivante
+   */
+  withAdvancedTurn(): Combat {
+    return this._stateService.withAdvancedTurn(this);
+  }
+
+  /**
    * Retourne un nouveau Combat démarré
    */
   withStartedCombat(): Combat {
@@ -539,12 +565,6 @@ export class Combat {
     return this._stateService.withStartedCombat(this);
   }
 
-  /**
-   * Retourne un nouveau Combat avec le tour avancé
-   */
-  withAdvancedTurn(): Combat {
-    return this._stateService.withAdvancedTurn(this);
-  }
 
   /**
    * Retourne un nouveau Combat avec des dégâts appliqués

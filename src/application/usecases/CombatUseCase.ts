@@ -11,7 +11,7 @@ import { type NarrativeMessage } from '../../domain/entities/NarrativeMessage';
 import { EnemyMapper } from '../mappers/EnemyMapper';
 import { DiceRollingService } from '../../domain/services/DiceRollingService';
 import { InitiativeService } from '../../domain/services/InitiativeService';
-import { DIContainer } from '../../infrastructure/container/DIContainer';
+// DIContainer import retiré - services injectés via constructeur
 import { logger } from '../../infrastructure/services/Logger';
 import type { SpellLevel } from '../../domain/entities/Spell';
 

@@ -21,7 +21,7 @@ export class Logger {
   private static instance: Logger;
   private logs: LogEntry[] = [];
   private maxLogs = 1000; // Éviter l'accumulation infinie
-  private logLevel: LogLevel = 'info';
+  private logLevel: LogLevel = 'debug'; // Mode développement - afficher tous les logs
   
   private constructor() {}
   
@@ -193,10 +193,10 @@ export class Logger {
     
     switch (log.level) {
       case 'debug':
-        console.debug(prefix, log.message, log.data);
+        console.log(prefix, log.message, log.data); // Utiliser console.log pour assurer l'affichage
         break;
       case 'info':
-        // console.info(prefix, log.message, log.data);
+        console.info(prefix, log.message, log.data); // Réactiver les logs info
         break;
       case 'warn':
         console.warn(prefix, log.message, log.data);

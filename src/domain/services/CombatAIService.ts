@@ -85,7 +85,7 @@ export class CombatAIService {
 
     // L'IA décide de l'action optimale via AIDecisionMaker
     const aiDecisionMaker = this.dependencies.aiDecisionMaker;
-    const decision = aiDecisionMaker.decideAction(currentEntity.id);
+    const decision = aiDecisionMaker.decideAction(combat, currentEntity.id);
     
     if (!decision) {
       return {

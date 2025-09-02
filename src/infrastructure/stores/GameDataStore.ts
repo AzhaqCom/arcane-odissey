@@ -68,4 +68,33 @@ export class GameDataStore {
       classes: CLASSES_DATA.length,
     };
   }
+
+  // Méthodes de recherche (implémentation basique pour corriger les erreurs TS)
+  searchWeapons(query: string): WeaponData[] {
+    return WEAPONS_DATA.filter(weapon => 
+      weapon.name.toLowerCase().includes(query.toLowerCase())
+    );
+  }
+
+  searchSpells(query: string): SpellData[] {
+    return SPELLS_DATA.filter(spell => 
+      spell.name.toLowerCase().includes(query.toLowerCase())
+    );
+  }
+
+  searchCharacters(query: string): AnyCharacterDataSource[] {
+    const allCharacters = [...PLAYERS_DATA, ...COMPANIONS_DATA];
+    return allCharacters.filter(char => 
+      char.name.toLowerCase().includes(query.toLowerCase())
+    );
+  }
+
+  // Méthodes de validation (implémentation basique)
+  validateWeaponIds(ids: string[]): boolean[] {
+    return ids.map(id => WEAPONS_DATA.some(weapon => weapon.id === id));
+  }
+
+  validateSpellIds(ids: string[]): boolean[] {
+    return ids.map(id => SPELLS_DATA.some(spell => spell.id === id));
+  }
 }

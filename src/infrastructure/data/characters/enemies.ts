@@ -18,7 +18,23 @@ export interface EnemyTemplate {
     readonly maxHp: number;
     readonly armorClass: number;
     readonly speed: number;
-    readonly actions: readonly string[]; // IDs des actions/attaques
+    readonly equipment: {
+        readonly weapons: readonly string[]; // IDs des armes depuis WEAPONS_DATA
+        readonly armor?: readonly string[];  // IDs des armures (optionnel)
+        readonly items?: readonly string[];  // Autres équipements (optionnel)
+    };
+    readonly specialAbilities?: readonly string[]; // Capacités uniques (souffle dragon, etc.)
+    readonly combatModifiers?: {
+        readonly attackBonus?: number;  // Bonus d'attaque spécifique
+        readonly damageBonus?: number;  // Bonus de dégâts spécifique
+        readonly resistances?: readonly string[]; // Résistances aux types de dégâts
+        readonly vulnerabilities?: readonly string[]; // Vulnérabilités
+    };
+    readonly aiProfile?: {
+        readonly behavior: 'aggressive' | 'defensive' | 'tactical' | 'cowardly';
+        readonly preferredRange: 'melee' | 'ranged' | 'mixed';
+        readonly aggroRadius?: number;
+    };
     readonly lootTable?: ReadonlyArray<{ itemId: string; dropChance: number; }>;
 }
 
@@ -31,7 +47,15 @@ export const ENEMY_TEMPLATES: readonly EnemyTemplate[] = [
         maxHp: 18,
         armorClass: 13,
         speed: 8,
-        actions: ['shortbow_attack', 'dagger_attack'],
+        equipment: {
+            weapons: ['shortbow', 'dagger'], // Référence vers WEAPONS_DATA
+            armor: ['leather_armor']
+        },
+        aiProfile: {
+            behavior: 'tactical',        // Éclaireur = tactique
+            preferredRange: 'ranged',    // Préfère l'arc
+            aggroRadius: 12
+        },
         lootTable: [{ itemId: 'gold_pouch_small', dropChance: 0.5 }]
     },
     {
@@ -42,7 +66,63 @@ export const ENEMY_TEMPLATES: readonly EnemyTemplate[] = [
         maxHp: 15,
         armorClass: 12,
         speed: 6,
-        actions: ['scimitar_attack'],
+        equipment: {
+            weapons: ['scimitar'],       // Référence vers WEAPONS_DATA
+            armor: ['leather_armor']
+        },
+        aiProfile: {
+            behavior: 'aggressive',      // Goblin de base = agressif
+            preferredRange: 'melee',     // Combat rapproché
+            aggroRadius: 8
+        },
         lootTable: [{ itemId: 'gold_pouch_small', dropChance: 0.3 }]
+    },
+    // Ajout de quelques ennemis supplémentaires pour la diversité
+    {
+        id: 'orc_warrior',
+        name: 'Guerrier Orc',
+        level: 3,
+        baseAbilities: { strength: 16, dexterity: 12, constitution: 16, intelligence: 7, wisdom: 11, charisma: 10 },
+        maxHp: 28,
+        armorClass: 14,
+        speed: 6,
+        equipment: {
+            weapons: ['battleaxe', 'handaxe'], // Hybride mêlée/jet
+            armor: ['chain_shirt']
+        },
+        combatModifiers: {
+            attackBonus: 1,          // Guerrier expérimenté
+            damageBonus: 2
+        },
+        aiProfile: {
+            behavior: 'aggressive',
+            preferredRange: 'melee',
+            aggroRadius: 10
+        },
+        lootTable: [{ itemId: 'gold_pouch_medium', dropChance: 0.4 }]
+    },
+    {
+        id: 'skeleton_archer',
+        name: 'Archer Squelette',
+        level: 2,
+        baseAbilities: { strength: 10, dexterity: 14, constitution: 15, intelligence: 6, wisdom: 8, charisma: 5 },
+        maxHp: 20,
+        armorClass: 13,
+        speed: 6,
+        equipment: {
+            weapons: ['shortbow', 'shortsword'],
+            armor: ['leather_armor']
+        },
+        combatModifiers: {
+            resistances: ['piercing'], // Résistance aux flèches
+            vulnerabilities: ['bludgeoning'] // Vulnérable aux masses
+        },
+        aiProfile: {
+            behavior: 'defensive',   // Reste à distance
+            preferredRange: 'ranged',
+            aggroRadius: 15
+        },
+        specialAbilities: ['undead_fortitude'], // Ne tombe pas facilement
+        lootTable: [{ itemId: 'bone_fragments', dropChance: 0.8 }]
     }
 ];

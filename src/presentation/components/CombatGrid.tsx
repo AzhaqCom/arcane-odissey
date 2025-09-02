@@ -80,17 +80,17 @@ export const CombatGrid: React.FC<CombatGridProps> = ({
     let cursor = 'default';
 
     // Cellule avec entité
-    if (entity) {
-      if (entity.type === 'player') {
-        backgroundColor = entity.id === currentEntity?.id ? '#cce5ff' : '#e8f5e8';
-      } else {
-        backgroundColor = entity.id === currentEntity?.id ? '#ffe5cc' : '#ffe8e8';
-      }
+    // if (entity) {
+    //   if (entity.type === 'player') {
+    //     backgroundColor = entity.id === currentEntity?.id ? '#cce5ff' : '#e8f5e8';
+    //   } else {
+    //     backgroundColor = entity.id === currentEntity?.id ? '#ffe5cc' : '#ffe8e8';
+    //   }
 
-      if (entity.isDead) {
-        backgroundColor = '#d0d0d0';
-      }
-    }
+    //   if (entity.isDead) {
+    //     backgroundColor = '#d0d0d0';
+    //   }
+    // }
 
     // Mode mouvement - surbrillance des cellules atteignables
     if (isMovementMode && isReachable && !entity) {

@@ -16,7 +16,7 @@
   font-weight: var(--font-weight-bold);
   color: var(--text-primary);
   text-align: center;
-  padding-bottom: var(--spacing-md);
+  /* padding-bottom: var(--spacing-md); */
 
 }
 
@@ -25,13 +25,13 @@
   font-size: var(--font-size-md);
   color: var(--text-muted);
   text-align: center;
-  margin-bottom: var(--spacing-md);
+  /* margin-bottom: var(--spacing-md); */
   font-style: italic;
 }
 
 /* Contenu textuel principal */
-.scene-text-content {
-  margin-bottom: var(--spacing-md);
+.scene-content-text {
+  font-size: var(--font-size-md);
 }
 
 .scene-text {
@@ -40,21 +40,24 @@
   color: var(--text-secondary);
   white-space: pre-line;
   /* Respect les sauts de ligne */
-  margin-bottom: var(--spacing-lg);
+  /* margin-bottom: var(--spacing-lg); */
 }
 
 /* Sorts contextuels */
 .contextual-spells {
-  margin-bottom: var(--spacing-xl);
+  margin-bottom: var(--spacing-md);
 }
 
 .contextual-spells-list {
   display: flex;
   gap: var(--spacing-sm);
   flex-wrap: wrap;
+  margin-top: var(--spacing-md);
 }
-
-.contextual-spell {
+.contextual-spells-toggle{
+  margin-top: var(--spacing-md)
+}
+.contextual-spell,.contextual-spells-toggle {
   background: rgba(96, 165, 250, 0.1);
   border: 1px solid var(--text-accent);
   border-radius: var(--radius-md);
@@ -86,7 +89,7 @@
   background: transparent;
   border: 2px solid var(--border-primary);
   border-radius: var(--radius-lg);
-  padding: var(--spacing-md) var(--spacing-lg);
+  padding: var(--spacing-sm) var(--spacing-md);
   color: var(--text-secondary);
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-medium);
@@ -134,7 +137,7 @@
   display: flex;
   justify-content: center;
   gap: var(--spacing-lg);
-  margin-bottom: var(--spacing-lg);
+  /* margin-bottom: var(--spacing-lg); */
   font-size: var(--font-size-xs);
   color: var(--text-muted);
 }
@@ -298,7 +301,7 @@
 .combat-main {
   display: flex;
   gap: var(--spacing-lg);
-  padding:5px 80px 5px 5px;
+  padding: 5px 80px 5px 5px;
   /* height: calc(100vh - var(--status-corner-height) - var(--spacing-xl)); */
   flex: 1;
   overflow: hidden;
@@ -314,18 +317,19 @@
   display: flex;
   flex-direction: column;
 }
+
 .combat-grid {
   display: grid;
-  grid-template-rows: 2fr 2fr 2fr 2fr 2fr 2fr 2fr 2fr ;
+  grid-template-rows: 2fr 2fr 2fr 2fr 2fr 2fr 2fr 2fr;
   border: 1px solid #495057;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  height: 100% ;
+  height: 100%;
   width: 100%;
 }
-.grid-cell{
-  
-}
+
+.grid-cell {}
+
 /* Positions des entités */
 
 .entity-icon {

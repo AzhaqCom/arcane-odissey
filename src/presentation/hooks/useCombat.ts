@@ -96,7 +96,7 @@ export const useCombat = (sceneContent: CombatSceneContent) => {
       if (spell.effects.damage && spell.effects.damage.length > 0) {
         // spell.effects.damage est un DamageRoll[]
         const firstDamage = spell.effects.damage[0];
-        const formatted = `${firstDamage.diceCount}d${firstDamage.diceType}${firstDamage.bonus > 0 ? `+${firstDamage.bonus}` : firstDamage.bonus < 0 ? firstDamage.bonus : ''}`;
+        const formatted = `${firstDamage.diceCount}d${firstDamage.diceType}${firstDamage.modifier > 0 ? `+${firstDamage.modifier}` : firstDamage.modifier < 0 ? firstDamage.modifier : ''}`;
         damages.set(spell.id, formatted);
       }
     });
@@ -201,12 +201,10 @@ export const useCombat = (sceneContent: CombatSceneContent) => {
       if (result.combat) setCombat(result.combat);
       
       // Log de l'action
-      addLog(result.success ? 'info' : 'error', result.message);
+      addLog(result.success ? 'info' : 'error', result.error || 'Mouvement effectué');
       
-      // Gestion des attaques d'opportunité si présentes
-      if (result.opportunityAttacks && result.opportunityAttacks.length > 0) {
-        addLog('warning', `Attaques d'opportunité provoquées par: ${result.opportunityAttacks.join(', ')}`);
-      }
+      // Les attaques d'opportunité sont gérées dans Combat.executeMovement
+      // Pas besoin de log séparé ici
       
       return result;
     } catch (err) {
@@ -223,15 +221,18 @@ export const useCombat = (sceneContent: CombatSceneContent) => {
     if (!combat) return;
     
     try {
-      // TODO: Implement turn advancement via CombatUseCase
-      const result = { newCombat: combat, message: 'Turn advanced' };
+      // Utiliser l'API immutable du domaine pour avancer le tour
+      const newCombat = combat.withAdvancedTurn();
+      const currentEntity = newCombat.getCurrentEntity();
       
       // Mise à jour de l'état React
-      setCombat(result.newCombat);
+      setCombat(newCombat);
       
       // Log de l'action
-      addLog('info', result.message);
+      const message = `Tour passé à ${currentEntity?.name || 'Entité inconnue'} (Round ${newCombat.round})`;
+      addLog('info', message);
       
+      const result = { newCombat, message: 'Turn advanced' };
       return result;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Erreur lors de l\'avancement du tour';

@@ -35,5 +35,4 @@ Bonjour. Nous reprenons notre travail. La refactorisation architecturale est ter
 
   ---
 
-  Commençons par l'Étape 1. Je te fournirai le fichier build_errors.log si tu ne peux pas le lire directement. Analyse-le et
-  donne-moi ta synthèse des catégories d'erreurs.
+  Commençons par l'Étape 1. Si le fichier build_errors.log n'est pas présent tu peux le creer.

@@ -98,9 +98,9 @@ export const GameLog: React.FC<GameLogProps> = ({
             Votre aventure commence...
           </div>
         ) : (
-          displayedMessages.map((message) => (
+          displayedMessages.map((message, index) => (
             <div 
-              key={message.id} 
+              key={`${message.id}-${index}`} 
               className={`game-log-message ${message.type}`} 
               style={getMessageStyle(message.type)}
             >
@@ -108,7 +108,7 @@ export const GameLog: React.FC<GameLogProps> = ({
                 {message.timestamp.toLocaleTimeString()}
               </span>
               <span className="log-icon">{getMessageIcon(message.type)}</span>
-              <span className="log-content">{message.content}</span>
+              <span className="log-content">{message.content || (message as any).message || '[Message vide]'}</span>
             </div>
           ))
         )}

@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { Scene, GameSession } from '../../domain/entities';
-import { Combat, type CombatEntity, type Position } from '../../domain/entities/Combat';
+import { Combat, type CombatEntity, type Position, type CombatPhase } from '../../domain/entities/Combat';
 import type { SceneAnalysis } from '../../application/usecases/SceneUseCase';
 // CombatPhase type not exported from useCombat - removing unused import
 import { CombatPanel } from './CombatPanel';
@@ -72,7 +72,17 @@ export const CombatScene: React.FC<CombatSceneProps> = ({
   const sceneContent = scene.content as any;
   
   // Utiliser les logs du combat plutôt que le hook local
-  const displayLogs = gameLogs || [];
+  // Dédupliquer les messages par ID + timestamp pour éviter les doublons
+  const displayLogs = React.useMemo(() => {
+    if (!gameLogs) return [];
+    const seen = new Set();
+    return gameLogs.filter(log => {
+      const key = `${log.id}-${log.timestamp}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [gameLogs]);
 
   return (
     <div className="scene-content scene-combat">
@@ -138,7 +148,7 @@ export const CombatScene: React.FC<CombatSceneProps> = ({
           
           {/* GameLog intégré en combat */}
           <div className="combat-game-log">
-            <GameLog entries={displayLogs} inCombat={true} />
+            <GameLog messages={displayLogs} inCombat={true} />
           </div>
         </div>
       </div>

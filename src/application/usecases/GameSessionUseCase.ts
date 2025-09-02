@@ -43,7 +43,7 @@ export class GameSessionUseCase {
   // Configuration par défaut (logique métier centralisée)
   private readonly DEFAULT_CONFIG: DefaultGameConfiguration = {
     playerCharacterId: 'Elarion',
-    startingSceneId: 'forest_ambush',
+    startingSceneId: 'forest_entrance',
     difficulty: 'normal'
   };
 
@@ -106,10 +106,10 @@ export class GameSessionUseCase {
 
       // === PHASE 5: NARRATIVE MESSAGE GENERATION ===
       const narrativeMessages = [
-        this.gameNarrativeService.createNarrativeMessage(
-          `Jeu initialisé - Scène: ${gameSession.currentSceneId}`,
-          'normal'
-        )
+        // this.gameNarrativeService.createNarrativeMessage(
+        //   `Jeu initialisé - Scène: ${gameSession.currentSceneId}`,
+        //   'normal'
+        // )
       ];
 
       logger.ui('GameSessionUseCase: Game session initialized successfully', {

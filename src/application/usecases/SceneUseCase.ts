@@ -87,11 +87,7 @@ export class SceneUseCase {
       // Vérifier si on peut quitter la scène
       const canLeave = this.canLeaveScene(scene, gameSession);
 
-      logger.scene(`Scene analysis complete: ${sceneId}`, {
-        choicesCount: availableChoices.length,
-        spellSuggestionsCount: contextualSpells.length,
-        canRest: restAllowed.short || restAllowed.long
-      });
+  
 
       return {
         scene,

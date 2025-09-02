@@ -172,26 +172,16 @@ export class DIContainer {
    * Factory pour créer Combat avec dépendances injectées
    */
   createCombat(id: string, gridDimensions?: any): Combat {
-    logger.debug('DI_CONTAINER', 'Creating Combat with dependencies...', {
-      servicesRegistered: Array.from(this.services.keys())
-    });
-
     const dependencies = {
-      diceRollingService: this.get('DiceRollingService'),
-      damageCalculationService: this.get('DamageCalculationService'),
-      abilityCalculationService: this.get('AbilityCalculationService'),
-      initiativeService: this.get('InitiativeService'),
-      tacticalCalculationService: this.get('TacticalCalculationService'),
-      actionPrioritizer: this.get('ActionPrioritizer'),
-      threatAssessment: this.get('ThreatAssessment'),
-      combatActionService: this.get('CombatActionService')
+      diceRollingService: this.get<DiceRollingService>('DiceRollingService'),
+      damageCalculationService: this.get<DamageCalculationService>('DamageCalculationService'),
+      abilityCalculationService: this.get<AbilityCalculationService>('AbilityCalculationService'),
+      initiativeService: this.get<InitiativeService>('InitiativeService'),
+      tacticalCalculationService: this.get<TacticalCalculationService>('TacticalCalculationService'),
+      actionPrioritizer: this.get<ActionPrioritizer>('ActionPrioritizer'),
+      threatAssessment: this.get<ThreatAssessment>('ThreatAssessment'),
+      combatActionService: this.get<CombatActionService>('CombatActionService')
     };
-
-    logger.debug('DI_CONTAINER', 'Combat dependencies resolved', {
-      diceRollingService: !!dependencies.diceRollingService,
-      damageCalculationService: !!dependencies.damageCalculationService,
-      abilityCalculationService: !!dependencies.abilityCalculationService
-    });
 
     return new Combat(id, gridDimensions, dependencies);
   }
