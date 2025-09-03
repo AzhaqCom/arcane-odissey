@@ -95,13 +95,11 @@ export class GameSessionUseCase {
         throw new Error('Failed to get game state after initialization');
       }
 
-      // === PHASE 4: SCENE ANALYSIS ===
-      const sceneAnalysis = await this.sceneUseCase.analyzeScene(
-        gameSession.currentSceneId,
-        gameSession
-      );
+      // ✅ OPTIMISATION: getGameState() inclut déjà l'analyse de scène
+      // Pas besoin de rappeler analyzeScene - on utilise currentSceneAnalysis de gameState
+      const sceneAnalysis = gameState.currentSceneAnalysis;
       if (!sceneAnalysis) {
-        throw new Error(`Failed to analyze scene: ${gameSession.currentSceneId}`);
+        throw new Error(`Failed to get scene analysis from game state: ${gameSession.currentSceneId}`);
       }
 
       // === PHASE 5: NARRATIVE MESSAGE GENERATION ===
@@ -161,13 +159,11 @@ export class GameSessionUseCase {
         return null;
       }
 
-      // Analyser la scène actuelle
-      const sceneAnalysis = await this.sceneUseCase.analyzeScene(
-        gameState.session.currentSceneId,
-        gameState.session
-      );
+      // ✅ OPTIMISATION: getGameState() inclut déjà l'analyse de scène
+      // Pas besoin de rappeler analyzeScene - on utilise currentSceneAnalysis de gameState
+      const sceneAnalysis = gameState.currentSceneAnalysis;
       if (!sceneAnalysis) {
-        logger.ui('GameSessionUseCase: Failed to analyze current scene');
+        logger.ui('GameSessionUseCase: Failed to get scene analysis from game state');
         return null;
       }
 

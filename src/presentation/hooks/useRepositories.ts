@@ -14,32 +14,42 @@ import type { GameDataStore } from '../../infrastructure/stores/GameDataStore';
 import type { SaveGameStore } from '../../infrastructure/stores/SaveGameStore';
 import type { SceneUseCase } from '../../application/usecases/SceneUseCase';
 import type { GameUseCase } from '../../application/usecases/GameUseCase';
-import type { CombatUseCase } from '../../application/usecases/CombatUseCase';
+// import type { CombatUseCase } from '../../application/usecases/CombatUseCase'; // ✅ SUPPRIMÉ - Remplacé par CombatGameUseCase
 
 /**
  * Hook pour accéder aux repositories de manière typée
  */
+// ✅ OPTIMISATION: Créer une seule fois les références aux services
+let repositoriesCache: ReturnType<typeof createRepositories> | null = null;
+
+const createRepositories = () => {
+  const container = DIContainer.getInstance();
+  
+  return {
+    // Stores
+    gameDataStore: container.get<GameDataStore>(TOKENS.GameDataStore),
+    saveGameStore: container.get<SaveGameStore>(TOKENS.SaveGameStore),
+    
+    // Repositories
+    weaponRepository: container.get<WeaponRepository>(TOKENS.WeaponRepository),
+    spellRepository: container.get<SpellRepository>(TOKENS.SpellRepository),
+    characterRepository: container.get<CharacterRepository>(TOKENS.CharacterRepository),
+    sceneRepository: container.get<SceneRepository>(TOKENS.SceneRepository),
+    gameSessionRepository: container.get<GameSessionRepository>(TOKENS.GameSessionRepository),
+    
+    // Use Cases
+    sceneUseCase: container.get<SceneUseCase>(TOKENS.SceneUseCase),
+    gameUseCase: container.get<GameUseCase>(TOKENS.GameUseCase),
+    // combatUseCase: SUPPRIMÉ - Utilisez CombatGameUseCase via useCombatGame() à la place
+  };
+};
+
 export const useRepositories = () => {
   return useMemo(() => {
-    const container = DIContainer.getInstance();
-    
-    return {
-      // Stores
-      gameDataStore: container.get<GameDataStore>(TOKENS.GameDataStore),
-      saveGameStore: container.get<SaveGameStore>(TOKENS.SaveGameStore),
-      
-      // Repositories
-      weaponRepository: container.get<WeaponRepository>(TOKENS.WeaponRepository),
-      spellRepository: container.get<SpellRepository>(TOKENS.SpellRepository),
-      characterRepository: container.get<CharacterRepository>(TOKENS.CharacterRepository),
-      sceneRepository: container.get<SceneRepository>(TOKENS.SceneRepository),
-      gameSessionRepository: container.get<GameSessionRepository>(TOKENS.GameSessionRepository),
-      
-      // Use Cases
-      sceneUseCase: container.get<SceneUseCase>(TOKENS.SceneUseCase),
-      gameUseCase: container.get<GameUseCase>(TOKENS.GameUseCase),
-      combatUseCase: container.get<CombatUseCase>(TOKENS.CombatUseCase),
-    };
+    if (!repositoriesCache) {
+      repositoriesCache = createRepositories();
+    }
+    return repositoriesCache;
   }, []);
 };
 

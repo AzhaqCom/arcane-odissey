@@ -29,6 +29,34 @@ export class DiceRollingService {
   }
 
   /**
+   * Lance des dés selon une notation standard (ex: "1d20", "2d6", "3d8+2")
+   * @param notation - Notation de dés (ex: "1d20", "2d6+3")
+   * @returns Résultat du jet
+   */
+  roll(notation: string): number {
+    // Parse la notation (ex: "2d6+3" -> 2 dés de 6 + 3)
+    const match = notation.match(/^(\d+)d(\d+)([+-]\d+)?$/);
+    if (!match) {
+      throw new Error(`Invalid dice notation: ${notation}`);
+    }
+
+    const diceCount = parseInt(match[1]);
+    const diceType = parseInt(match[2]);
+    const modifier = match[3] ? parseInt(match[3]) : 0;
+
+    if (![4, 6, 8, 10, 12, 20, 100].includes(diceType)) {
+      throw new Error(`Invalid dice type: d${diceType}`);
+    }
+
+    let total = 0;
+    for (let i = 0; i < diceCount; i++) {
+      total += Math.floor(this._randomGenerator.random() * diceType) + 1;
+    }
+    
+    return total + modifier;
+  }
+
+  /**
    * PHASE 3 - ACTION 3.1.2: Lance plusieurs dés - injection pure
    * @param diceCount - Nombre de dés à lancer
    * @param diceType - Type de dé (4, 6, 8, 10, 12, 20)

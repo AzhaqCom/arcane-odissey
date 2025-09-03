@@ -1,18 +1,12 @@
+// TYPES LEGACY - Utilisent les types centralisés du domain
+import type { AbilityScores, AttackType, DamageType } from '../../domain/types/core';
+
 // Temporary type until classDefinitions is properly created
 export type ClassKey = 'fighter' | 'wizard' | 'rogue' | 'cleric' | 'ranger' | 'barbarian' | 'bard' | 'druid' | 'monk' | 'paladin' | 'sorcerer' | 'warlock';
-export type AttackType = 'melee' | 'ranged';
-export type DamageType = 'tranchant' | 'perforant' | 'contondant' | 'feu' | 'force';
 export type SpellcastingType = 'prepared' | 'known';
 
-
-export interface Stats {
-    strength: number;
-    dexterity: number;
-    constitution: number;
-    intelligence: number;
-    wisdom: number;
-    charisma: number;
-}
+// ✅ Utilise AbilityScores centralisé au lieu de Stats dupliqué
+export type Stats = AbilityScores;
 export const STATS = {
     strength: 'strength',
     dexterity: 'dexterity',

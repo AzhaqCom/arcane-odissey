@@ -3,7 +3,7 @@
  * Tous les cas d'usage de l'application
  */
 
-export { CombatUseCase } from './CombatUseCase';
+export { CombatGameUseCase } from './CombatGameUseCase';
 export { GameUseCase } from './GameUseCase';
 export { SceneUseCase } from './SceneUseCase';
 export { GameSessionUseCase } from './GameSessionUseCase';

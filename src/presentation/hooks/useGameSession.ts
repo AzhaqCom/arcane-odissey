@@ -46,15 +46,7 @@ export const useGameSession = (): UseGameSessionReturn => {
     [gameUseCase, sceneUseCase]
   );
 
-  // Initialisation automatique au montage
-  React.useEffect(() => {
-    initializeSession();
-  }, [gameSessionUseCase]);
-
-  /**
-   * Initialiser une nouvelle session de jeu
-   * Délègue tout à GameSessionUseCase.initializeGameSession()
-   */
+  // ✅ OPTIMISATION: Fonction d'initialisation memoized
   const initializeSession = React.useCallback(async () => {
     logger.ui('useGameSession: Starting session initialization');
     
@@ -76,6 +68,19 @@ export const useGameSession = (): UseGameSessionReturn => {
       });
     }
   }, [gameSessionUseCase]);
+
+  // ✅ OPTIMISATION: Utiliser une ref pour éviter les re-runs multiples
+  const initializationRef = React.useRef(false);
+  
+  // Initialisation automatique au montage (une seule fois)
+  React.useEffect(() => {
+    if (!initializationRef.current) {
+      initializationRef.current = true;
+      initializeSession();
+    }
+  }, [initializeSession]);
+
+  // ✅ initializeSession déjà définie plus haut dans le useCallback optimisé
 
   /**
    * Gérer une transition de scène

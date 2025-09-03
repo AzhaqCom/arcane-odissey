@@ -1,0 +1,422 @@
+/**
+ * COMBAT PHOENIX STYLES
+ * Styles CSS pour le système de combat Phoenix
+ * Reprend les styles legacy avec améliorations
+ */
+
+/* =========================
+   LAYOUT PRINCIPAL
+   ========================= */
+
+.scene-combat {
+  width: 100%;
+  height: 100vh;
+  background: linear-gradient(135deg, #1a1a2e, #2c1810);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.combat-header {
+  padding: 10px 20px;
+  background-color: rgba(0, 0, 0, 0.7);
+  border-bottom: 2px solid #333;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.combat-main {
+  flex: 1;
+  display: flex;
+  gap: 20px;
+  padding: 20px;
+  height: calc(100vh - 80px);
+  overflow: hidden;
+}
+
+.combat-battlefield {
+  flex: 0 0 64%;
+  background-color: rgba(15, 23, 42, 0.3);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+}
+
+.combat-right-panel {
+  flex: 0 0 35%;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  min-width: 300px;
+}
+
+/* =========================
+   GRILLE DE COMBAT
+   ========================= */
+
+.combat-grid {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 800px;
+  aspect-ratio: 3/2;
+  border: 2px solid #333;
+  background-color: rgba(15, 23, 42, 0.3);
+  border-radius: 4px;
+  padding: 4px;
+}
+
+.grid-entity-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 10px;
+  padding: 2px;
+  width: 100%;
+}
+
+.entity-name {
+  font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  color: black;
+}
+
+.entity-hp-bar {
+  width: 80%;
+  height: 4px;
+  background-color: #ccc;
+  border-radius: 2px;
+  overflow: hidden;
+  margin: 2px 0;
+}
+
+.entity-hp-fill {
+  height: 100%;
+  transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+.entity-hp-text {
+  font-size: 9px;
+  color: #333;
+  font-weight: bold;
+}
+
+/* Cellules atteignables en mode mouvement */
+.reachable-cell {
+  background-color: #352941 !important;
+  border-color: #8962b1ff !important;
+  cursor: pointer !important;
+}
+
+/* =========================
+   PANEL DE COMBAT
+   ========================= */
+
+.combat-panel {
+  font-family: Arial, sans-serif;
+  background-color: rgba(31, 41, 55, 0.95);
+  min-height: 400px;
+  padding: 15px;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.combat-panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.combat-actions-header {
+  padding: 10px;
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 4px 4px 0 0;
+  border-bottom: 2px solid #333;
+}
+
+.combat-actions-header h3 {
+  margin: 0;
+  color: #60a5fa;
+  font-size: 16px;
+}
+
+.combat-phase-info {
+  padding: 15px;
+  background-color: rgba(26, 26, 26, 0.8);
+  border-radius: 4px;
+}
+
+.entity-status-card {
+  padding: 10px;
+  background-color: rgba(31, 41, 55, 0.8);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.entity-stats {
+  color: #ccc;
+  font-size: 14px;
+}
+
+.entity-actions-status {
+  color: #888;
+  font-size: 12px;
+  margin-top: 5px;
+}
+
+/* =========================
+   BOUTONS D'ACTIONS
+   ========================= */
+
+.action-button {
+  padding: 10px 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.action-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.action-button:active {
+  transform: translateY(0);
+}
+
+/* Couleurs spécifiques par type d'action */
+.weapon-button {
+  background-color: #d32f2f;
+  color: white;
+}
+
+.weapon-button:hover {
+  background-color: #b71c1c;
+}
+
+.movement-button {
+  background-color: #FF9800;
+  color: white;
+}
+
+.movement-button:hover {
+  background-color: #F57C00;
+}
+
+.spell-button {
+  background-color: #7b1fa2;
+  color: white;
+}
+
+.spell-button:hover {
+  background-color: #6a1b9a;
+}
+
+.end-turn-button {
+  background-color: #6c757d;
+  color: white;
+}
+
+.end-turn-button:hover {
+  background-color: #5a6268;
+}
+
+.start-button {
+  background-color: #4CAF50;
+  color: white;
+}
+
+.start-button:hover {
+  background-color: #45a049;
+}
+
+.cancel-button {
+  background-color: #dc3545;
+  color: white;
+}
+
+.cancel-button:hover {
+  background-color: #c82333;
+}
+
+/* =========================
+   ACTIONS COMBAT
+   ========================= */
+
+.combat-actions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.actions-category {
+  margin-bottom: 5px;
+}
+
+.actions-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.action-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.action-subheader {
+  color: #FF5722;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+/* =========================
+   TOUR IA
+   ========================= */
+
+.ai-thinking-card {
+  padding: 15px;
+  background-color: rgba(31, 41, 55, 0.8);
+  border-radius: 4px;
+  text-align: center;
+}
+
+.ai-thinking-indicator {
+  color: #FF9800;
+  font-size: 16px;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+/* =========================
+   FIN DE COMBAT
+   ========================= */
+
+.combat-end-card {
+  text-align: center;
+  padding: 20px;
+  border-radius: 4px;
+  animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* =========================
+   LOGS DE COMBAT
+   ========================= */
+
+.combat-logs-container {
+  background-color: rgba(31, 41, 55, 0.95);
+  border-radius: 4px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+}
+
+.logs-header {
+  margin-bottom: 10px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.logs-header h4 {
+  color: #60a5fa;
+  margin: 0;
+  font-size: 14px;
+}
+
+/* =========================
+   RESPONSIVE
+   ========================= */
+
+@media (max-width: 1200px) {
+  .combat-main {
+    flex-direction: column;
+  }
+  
+  .combat-battlefield,
+  .combat-right-panel {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .combat-header {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .combat-info {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .combat-grid {
+    max-width: 100%;
+  }
+}
+
+/* =========================
+   ANIMATIONS
+   ========================= */
+
+.fadeInUp {
+  animation: fadeInUp 0.3s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* =========================
+   UTILITAIRES
+   ========================= */
+
+.text-danger { color: #ef4444; }
+.text-success { color: #10b981; }
+.text-warning { color: #f59e0b; }
+.text-info { color: #60a5fa; }
+.text-muted { color: #888; }
+
+.mb-0 { margin-bottom: 0; }
+.mb-1 { margin-bottom: 5px; }
+.mb-2 { margin-bottom: 10px; }
+.mb-3 { margin-bottom: 15px; }
+
+.p-0 { padding: 0; }
+.p-1 { padding: 5px; }
+.p-2 { padding: 10px; }
+.p-3 { padding: 15px; }

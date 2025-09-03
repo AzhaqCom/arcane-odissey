@@ -7,7 +7,9 @@ import React from 'react';
 import { Scene, GameSession } from '../../domain/entities';
 import type { SceneAnalysis } from '../../application/usecases/SceneUseCase';
 import { SceneText } from './SceneText';
-import { CombatContainer } from '../containers/CombatContainer';
+// import { CombatContainer } from '../containers/CombatContainer'; // ✅ ANCIEN SYSTÈME
+// import { CombatTestPage } from './CombatTestPage'; // ✅ Version test
+import { CombatScenePhoenix } from './CombatScenePhoenix'; // ✅ SYSTÈME PHOENIX FINAL
 import { logger } from '../../infrastructure/services/Logger';
 
 interface SceneRendererProps {
@@ -56,16 +58,11 @@ export const SceneRenderer: React.FC<SceneRendererProps> = ({
       );
 
     case 'combat':
+      logger.info('SCENE_RENDERER', 'Loading Phoenix Combat System', { sceneId: scene.id });
       return (
-        <CombatContainer
-          scene={scene}
-          gameSession={gameSession}
-          sceneAnalysis={sceneAnalysis}
-          onChoiceSelected={onChoiceSelected}
-          onCombatComplete={() => {
-            // Transition vers scène suivante ou menu
-            logger.ui('Combat completed, returning to scene navigation');
-          }}
+        <CombatScenePhoenix 
+          sceneTitle={scene.title}
+          sceneDescription={scene.description}
         />
       );
 

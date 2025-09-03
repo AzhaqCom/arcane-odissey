@@ -11,7 +11,7 @@ export type { GamePhase, Difficulty, GameTime, GameFlags, GameMetrics, SaveMetad
 
 export { Character } from './Character';
 
-export { Combat } from './Combat';
+
 export { EffectsManager } from './Effects';
 export { Spell, SpellSlots } from './Spell';
 export { Time } from './Time';

@@ -3,7 +3,7 @@
  * Point d'entrée pour tous les use cases
  */
 
-export { CombatUseCase } from './usecases/CombatUseCase';
+export { CombatGameUseCase } from './usecases/CombatGameUseCase';
 export { GameUseCase } from './usecases/GameUseCase';
 export { SceneUseCase } from './usecases/SceneUseCase';
 

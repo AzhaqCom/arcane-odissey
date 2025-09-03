@@ -4,10 +4,7 @@
  * Respecte la Règle #3 - Logique Métier dans Domain
  */
 
-export interface Position {
-  readonly x: number;
-  readonly y: number;
-}
+import type { Position } from '../types/core';
 
 export class TacticalCalculationService {
   /**

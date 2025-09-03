@@ -5,8 +5,13 @@
  */
 
 import type { CombatSceneContent } from '../../infrastructure/data/types/SceneData';
-import type { EnemyEncounter } from '../usecases/CombatUseCase';
-import type { Position } from '../../domain/entities/Combat';
+// EnemyEncounter type défini localement (pas dans CombatGameUseCase Phoenix)
+interface EnemyEncounter {
+  enemyId: string;
+  position: Position;
+}
+// Position type défini localement (plus dans Combat legacy)
+type Position = { x: number; y: number };
 
 export class EncounterMapper {
   

@@ -1,6 +1,7 @@
 /**
  * DOMAIN ENTITY - GameSession
  * Aggregate Root pour l'état global du jeu
+ * ✅ ARCHITECTURE_GUIDELINES.md - Règle #4 : Entité complètement immutable
  */
 
 import { Character } from './Character';
@@ -40,46 +41,67 @@ export interface SaveMetadata {
   readonly totalPlayTime: number;
 }
 
+export interface GameSessionProps {
+  readonly sessionId: string;
+  readonly createdAt: Date;
+  readonly lastSavedAt?: Date;
+  readonly currentPhase: GamePhase;
+  readonly difficulty: Difficulty;
+  readonly gameTime: GameTime;
+  readonly flags: ReadonlyMap<string, boolean | number | string>;
+  readonly metrics: GameMetrics;
+  readonly currentSceneId: string;
+  readonly sceneHistory: readonly string[];
+  readonly playerCharacter: Character;
+  readonly companions: readonly Character[];
+  readonly autoSaveEnabled: boolean;
+  readonly autoSaveInterval: number;
+}
+
 /**
  * GAMESESSION - Aggregate Root
- * Représente l'état complet d'une session de jeu
+ * ✅ COMPLÈTEMENT IMMUTABLE - Toutes propriétés readonly
+ * ✅ Pattern with...() pour mutations
+ * ✅ Respecte ARCHITECTURE_GUIDELINES.md Règle #4
  */
 export class GameSession {
-  private readonly _sessionId: string;
-  private readonly _createdAt: Date;
-  private _lastSavedAt?: Date;
-  private readonly _logger: ILogger;
+  public readonly sessionId: string;
+  public readonly createdAt: Date;
+  public readonly lastSavedAt?: Date;
+  private readonly logger: ILogger;
   
-  private _currentPhase: GamePhase;
-  private _difficulty: Difficulty;
-  private _gameTime: GameTime;
-  private _flags: Map<string, boolean | number | string>;
-  private _metrics: GameMetrics;
+  public readonly currentPhase: GamePhase;
+  public readonly difficulty: Difficulty;
+  public readonly gameTime: GameTime;
+  public readonly flags: ReadonlyMap<string, boolean | number | string>;
+  public readonly metrics: GameMetrics;
   
-  private _currentSceneId: string;
-  private _sceneHistory: string[];
-  private _playerCharacter: Character;
-  private _companions: Character[];
+  public readonly currentSceneId: string;
+  public readonly sceneHistory: readonly string[];
+  public readonly playerCharacter: Character;
+  public readonly companions: readonly Character[];
   
-  private _autoSaveEnabled: boolean;
-  private _autoSaveInterval: number; // en minutes
+  public readonly autoSaveEnabled: boolean;
+  public readonly autoSaveInterval: number;
   
   constructor(
     sessionId: string,
     playerCharacter: Character,
     logger: ILogger,
     startingSceneId: string = 'prologue',
-    difficulty: Difficulty = 'normal'
+    difficulty: Difficulty = 'normal',
+    props?: Partial<GameSessionProps>
   ) {
-    this._sessionId = sessionId;
-    this._createdAt = new Date();
-    this._logger = logger;
+    this.sessionId = sessionId;
+    this.createdAt = props?.createdAt ?? new Date();
+    this.lastSavedAt = props?.lastSavedAt;
+    this.logger = logger;
     
-    this._currentPhase = 'character_creation';
-    this._difficulty = difficulty;
-    this._gameTime = { totalMinutes: 0, day: 1, hour: 8, minute: 0 }; // Début à 8h du jour 1
-    this._flags = new Map();
-    this._metrics = {
+    this.currentPhase = props?.currentPhase ?? 'character_creation';
+    this.difficulty = difficulty;
+    this.gameTime = props?.gameTime ?? { totalMinutes: 0, day: 1, hour: 8, minute: 0 };
+    this.flags = props?.flags ?? new Map();
+    this.metrics = props?.metrics ?? {
       combatsWon: 0,
       combatsLost: 0,
       scenesVisited: 0,
@@ -89,44 +111,322 @@ export class GameSession {
       timePlayedMinutes: 0
     };
     
-    this._currentSceneId = startingSceneId;
-    this._sceneHistory = [];
-    this._playerCharacter = playerCharacter;
-    this._companions = [];
+    this.currentSceneId = props?.currentSceneId ?? startingSceneId;
+    this.sceneHistory = props?.sceneHistory ?? [];
+    this.playerCharacter = playerCharacter;
+    this.companions = props?.companions ?? [];
     
-    this._autoSaveEnabled = true;
-    this._autoSaveInterval = 5; // Sauvegarde automatique toutes les 5 minutes
+    this.autoSaveEnabled = props?.autoSaveEnabled ?? true;
+    this.autoSaveInterval = props?.autoSaveInterval ?? 5;
     
-    this._logger.game(`GameSession created: ${this._sessionId}`, { 
-      playerId: this._playerCharacter.id,
-      difficulty: this._difficulty,
+    this.logger.game(`GameSession created: ${this.sessionId}`, { 
+      playerId: this.playerCharacter.id,
+      difficulty: this.difficulty,
       startingScene: startingSceneId
     });
   }
   
-  // GETTERS (Pure)
-  get sessionId(): string { return this._sessionId; }
-  get createdAt(): Date { return this._createdAt; }
-  get lastSavedAt(): Date | undefined { return this._lastSavedAt; }
-  get currentPhase(): GamePhase { return this._currentPhase; }
-  get difficulty(): Difficulty { return this._difficulty; }
-  get gameTime(): GameTime { return { ...this._gameTime }; }
-  get currentSceneId(): string { return this._currentSceneId; }
-  get sceneHistory(): readonly string[] { return [...this._sceneHistory]; }
-  get playerCharacter(): Character { return this._playerCharacter; }
-  get companions(): readonly Character[] { return [...this._companions]; }
-  get metrics(): GameMetrics { return { ...this._metrics }; }
-  get autoSaveEnabled(): boolean { return this._autoSaveEnabled; }
-  get autoSaveInterval(): number { return this._autoSaveInterval; }
-  
-  // BUSINESS RULES - Phase Management
+  // === PATTERN WITH...() - MUTATIONS IMMUTABLES ===
   
   /**
-   * Changer la phase de jeu
+   * ✅ IMMUTABLE: Retourne nouvelle GameSession avec nouvelle scène
    */
-  changePhase(newPhase: GamePhase): GameSession {
-    return this.withPhase(newPhase);
+  withNewScene(sceneId: string): GameSession {
+    if (this.currentSceneId === sceneId) {
+      return this; // Pas de changement
+    }
+
+    const newSceneHistory = [...this.sceneHistory, this.currentSceneId];
+    const limitedHistory = newSceneHistory.length > 50 
+      ? newSceneHistory.slice(1)
+      : newSceneHistory;
+
+    const updatedMetrics: GameMetrics = {
+      ...this.metrics,
+      scenesVisited: this.metrics.scenesVisited + 1
+    };
+
+    return new GameSession(
+      this.sessionId,
+      this.playerCharacter,
+      this.logger,
+      sceneId,
+      this.difficulty,
+      {
+        createdAt: this.createdAt,
+        lastSavedAt: this.lastSavedAt,
+        currentPhase: this.currentPhase,
+        gameTime: this.gameTime,
+        flags: this.flags,
+        metrics: updatedMetrics,
+        currentSceneId: sceneId,
+        sceneHistory: limitedHistory,
+        companions: this.companions,
+        autoSaveEnabled: this.autoSaveEnabled,
+        autoSaveInterval: this.autoSaveInterval
+      }
+    );
   }
+
+  /**
+   * ✅ IMMUTABLE: Retourne nouvelle GameSession avec scène précédente
+   */
+  withPreviousScene(): GameSession | null {
+    if (this.sceneHistory.length === 0) {
+      return null;
+    }
+
+    const previousSceneId = this.sceneHistory[this.sceneHistory.length - 1];
+    const newSceneHistory = this.sceneHistory.slice(0, -1);
+
+    return new GameSession(
+      this.sessionId,
+      this.playerCharacter,
+      this.logger,
+      previousSceneId,
+      this.difficulty,
+      {
+        createdAt: this.createdAt,
+        lastSavedAt: this.lastSavedAt,
+        currentPhase: this.currentPhase,
+        gameTime: this.gameTime,
+        flags: this.flags,
+        metrics: this.metrics,
+        currentSceneId: previousSceneId,
+        sceneHistory: newSceneHistory,
+        companions: this.companions,
+        autoSaveEnabled: this.autoSaveEnabled,
+        autoSaveInterval: this.autoSaveInterval
+      }
+    );
+  }
+
+  /**
+   * ✅ IMMUTABLE: Retourne nouvelle GameSession avec phase mise à jour
+   */
+  withPhase(newPhase: GamePhase): GameSession {
+    if (this.currentPhase === newPhase) {
+      return this;
+    }
+
+    return new GameSession(
+      this.sessionId,
+      this.playerCharacter,
+      this.logger,
+      this.currentSceneId,
+      this.difficulty,
+      {
+        createdAt: this.createdAt,
+        lastSavedAt: this.lastSavedAt,
+        currentPhase: newPhase,
+        gameTime: this.gameTime,
+        flags: this.flags,
+        metrics: this.metrics,
+        sceneHistory: this.sceneHistory,
+        companions: this.companions,
+        autoSaveEnabled: this.autoSaveEnabled,
+        autoSaveInterval: this.autoSaveInterval
+      }
+    );
+  }
+
+  /**
+   * ✅ IMMUTABLE: Retourne nouvelle GameSession avec temps avancé
+   */
+  withAdvancedTime(minutes: number): GameSession {
+    const newTotalMinutes = this.gameTime.totalMinutes + minutes;
+    const newDay = Math.floor(newTotalMinutes / (24 * 60)) + 1;
+    const dayMinutes = newTotalMinutes % (24 * 60);
+    const newHour = Math.floor(dayMinutes / 60);
+    const newMinute = dayMinutes % 60;
+
+    const newGameTime: GameTime = {
+      totalMinutes: newTotalMinutes,
+      day: newDay,
+      hour: newHour,
+      minute: newMinute
+    };
+
+    return new GameSession(
+      this.sessionId,
+      this.playerCharacter,
+      this.logger,
+      this.currentSceneId,
+      this.difficulty,
+      {
+        createdAt: this.createdAt,
+        lastSavedAt: this.lastSavedAt,
+        currentPhase: this.currentPhase,
+        gameTime: newGameTime,
+        flags: this.flags,
+        metrics: this.metrics,
+        sceneHistory: this.sceneHistory,
+        companions: this.companions,
+        autoSaveEnabled: this.autoSaveEnabled,
+        autoSaveInterval: this.autoSaveInterval
+      }
+    );
+  }
+
+  /**
+   * ✅ IMMUTABLE: Retourne nouvelle GameSession avec métriques mises à jour
+   */
+  withUpdatedMetrics(updates: Partial<GameMetrics>): GameSession {
+    const newMetrics: GameMetrics = { ...this.metrics, ...updates };
+
+    return new GameSession(
+      this.sessionId,
+      this.playerCharacter,
+      this.logger,
+      this.currentSceneId,
+      this.difficulty,
+      {
+        createdAt: this.createdAt,
+        lastSavedAt: this.lastSavedAt,
+        currentPhase: this.currentPhase,
+        gameTime: this.gameTime,
+        flags: this.flags,
+        metrics: newMetrics,
+        sceneHistory: this.sceneHistory,
+        companions: this.companions,
+        autoSaveEnabled: this.autoSaveEnabled,
+        autoSaveInterval: this.autoSaveInterval
+      }
+    );
+  }
+
+  /**
+   * ✅ IMMUTABLE: Retourne nouvelle GameSession avec flag mis à jour
+   */
+  withFlag(key: string, value: boolean | number | string): GameSession {
+    const newFlags = new Map(this.flags);
+    newFlags.set(key, value);
+
+    this.logger.game(`Flag set: ${key}`, { 
+      oldValue: this.flags.get(key), 
+      newValue: value 
+    });
+
+    return new GameSession(
+      this.sessionId,
+      this.playerCharacter,
+      this.logger,
+      this.currentSceneId,
+      this.difficulty,
+      {
+        createdAt: this.createdAt,
+        lastSavedAt: this.lastSavedAt,
+        currentPhase: this.currentPhase,
+        gameTime: this.gameTime,
+        flags: newFlags,
+        metrics: this.metrics,
+        sceneHistory: this.sceneHistory,
+        companions: this.companions,
+        autoSaveEnabled: this.autoSaveEnabled,
+        autoSaveInterval: this.autoSaveInterval
+      }
+    );
+  }
+
+  /**
+   * ✅ IMMUTABLE: Retourne nouvelle GameSession avec timestamp sauvegarde
+   */
+  withSavedTimestamp(): GameSession {
+    return new GameSession(
+      this.sessionId,
+      this.playerCharacter,
+      this.logger,
+      this.currentSceneId,
+      this.difficulty,
+      {
+        createdAt: this.createdAt,
+        lastSavedAt: new Date(),
+        currentPhase: this.currentPhase,
+        gameTime: this.gameTime,
+        flags: this.flags,
+        metrics: this.metrics,
+        sceneHistory: this.sceneHistory,
+        companions: this.companions,
+        autoSaveEnabled: this.autoSaveEnabled,
+        autoSaveInterval: this.autoSaveInterval
+      }
+    );
+  }
+
+  /**
+   * ✅ IMMUTABLE: Retourne nouvelle GameSession avec compagnon ajouté
+   */
+  withAddedCompanion(companion: Character): GameSession {
+    if (this.companions.find(c => c.id === companion.id)) {
+      return this; // Compagnon déjà présent
+    }
+
+    const newCompanions = [...this.companions, companion];
+
+    this.logger.game(`Companion added: ${companion.name}`, { 
+      companionId: companion.id,
+      partySize: newCompanions.length + 1 
+    });
+
+    return new GameSession(
+      this.sessionId,
+      this.playerCharacter,
+      this.logger,
+      this.currentSceneId,
+      this.difficulty,
+      {
+        createdAt: this.createdAt,
+        lastSavedAt: this.lastSavedAt,
+        currentPhase: this.currentPhase,
+        gameTime: this.gameTime,
+        flags: this.flags,
+        metrics: this.metrics,
+        sceneHistory: this.sceneHistory,
+        companions: newCompanions,
+        autoSaveEnabled: this.autoSaveEnabled,
+        autoSaveInterval: this.autoSaveInterval
+      }
+    );
+  }
+
+  /**
+   * ✅ IMMUTABLE: Retourne nouvelle GameSession avec compagnon retiré
+   */
+  withRemovedCompanion(companionId: string): GameSession {
+    const companion = this.companions.find(c => c.id === companionId);
+    if (!companion) {
+      return this; // Compagnon non trouvé
+    }
+
+    const newCompanions = this.companions.filter(c => c.id !== companionId);
+
+    this.logger.game(`Companion removed: ${companion.name}`, { 
+      companionId,
+      partySize: newCompanions.length + 1 
+    });
+
+    return new GameSession(
+      this.sessionId,
+      this.playerCharacter,
+      this.logger,
+      this.currentSceneId,
+      this.difficulty,
+      {
+        createdAt: this.createdAt,
+        lastSavedAt: this.lastSavedAt,
+        currentPhase: this.currentPhase,
+        gameTime: this.gameTime,
+        flags: this.flags,
+        metrics: this.metrics,
+        sceneHistory: this.sceneHistory,
+        companions: newCompanions,
+        autoSaveEnabled: this.autoSaveEnabled,
+        autoSaveInterval: this.autoSaveInterval
+      }
+    );
+  }
+  
+  // === BUSINESS RULES - PURE FUNCTIONS ===
   
   /**
    * Vérifier si on peut passer à une phase donnée
@@ -140,566 +440,144 @@ export class GameSession {
    * Obtenir les transitions de phase autorisées
    */
   private getAllowedPhaseTransitions(): GamePhase[] {
-    switch (this._currentPhase) {
-      case 'character_creation':
-        return ['scene_navigation'];
-        
-      case 'scene_navigation':
-        return ['combat', 'dialogue', 'inventory', 'rest', 'game_over'];
-        
-      case 'combat':
-        return ['scene_navigation', 'inventory', 'game_over'];
-        
-      case 'dialogue':
-        return ['scene_navigation', 'combat', 'inventory'];
-        
-      case 'inventory':
-        return ['scene_navigation', 'combat', 'dialogue', 'rest'];
-        
-      case 'rest':
-        return ['scene_navigation', 'combat'];
-        
-      case 'game_over':
-        return ['character_creation'];
-        
-      default:
-        return [];
+    switch (this.currentPhase) {
+      case 'character_creation': return ['scene_navigation'];
+      case 'scene_navigation': return ['combat', 'dialogue', 'inventory', 'rest', 'game_over'];
+      case 'combat': return ['scene_navigation', 'inventory', 'game_over'];
+      case 'dialogue': return ['scene_navigation', 'combat', 'inventory'];
+      case 'inventory': return ['scene_navigation', 'combat', 'dialogue', 'rest'];
+      case 'rest': return ['scene_navigation', 'combat'];
+      case 'game_over': return ['character_creation'];
+      default: return [];
     }
   }
-  
-  // BUSINESS RULES - Scene Navigation
-  
-  /**
-   * Retourne une nouvelle GameSession avec une nouvelle scène
-   * Respecte le principe d'immutabilité - Règle #2 ARCHITECTURE_GUIDELINES.md
-   */
-  public withNewScene(sceneId: string): GameSession {
-    if (this._currentSceneId === sceneId) {
-      return this; // Pas de changement, retourner la même instance
-    }
 
-    // Créer un nouvel historique sans mutation
-    const newSceneHistory = [...this._sceneHistory, this._currentSceneId];
-    
-    // Limiter l'historique à 50 scènes pour éviter la surcharge
-    const limitedHistory = newSceneHistory.length > 50 
-      ? newSceneHistory.slice(1) // Supprimer le premier élément
-      : newSceneHistory;
-
-    // Créer métriques mises à jour
-    const updatedMetrics = {
-      ...this._metrics,
-      scenesVisited: this._metrics.scenesVisited + 1
-    };
-
-    // Créer une nouvelle instance avec les nouvelles valeurs
-    const newSession = new GameSession(
-      this._sessionId,
-      this._playerCharacter,
-      this._logger,
-      sceneId, // ← Nouvelle scène
-      this._difficulty
-    );
-
-    // Copier l'état immutable
-    (newSession as any)._createdAt = this._createdAt;
-    (newSession as any)._lastSavedAt = this._lastSavedAt;
-    (newSession as any)._currentPhase = this._currentPhase;
-    (newSession as any)._gameTime = { ...this._gameTime };
-    (newSession as any)._flags = new Map(this._flags);
-    (newSession as any)._metrics = updatedMetrics;
-    (newSession as any)._sceneHistory = limitedHistory; // ← Historique immutable
-    (newSession as any)._companions = [...this._companions];
-    (newSession as any)._autoSaveEnabled = this._autoSaveEnabled;
-    (newSession as any)._autoSaveInterval = this._autoSaveInterval;
-
-    this._logger.game(`Navigation to scene: ${sceneId}`, { 
-      previousScene: this._currentSceneId,
-      historyLength: limitedHistory.length
-    });
-
-    return newSession;
-  }
-
-  /**
-   * Retourne une nouvelle GameSession avec la scène précédente
-   * Respecte le principe d'immutabilité - Règle #2 ARCHITECTURE_GUIDELINES.md
-   */
-  public withPreviousScene(): GameSession | null {
-    if (this._sceneHistory.length === 0) {
-      return null; // Pas de scène précédente disponible
-    }
-
-    // Récupérer la dernière scène de l'historique
-    const previousSceneId = this._sceneHistory[this._sceneHistory.length - 1];
-    
-    // Créer un nouvel historique sans la dernière scène (immutable)
-    const newSceneHistory = this._sceneHistory.slice(0, -1);
-
-    // Créer une nouvelle instance avec la scène précédente
-    const newSession = new GameSession(
-      this._sessionId,
-      this._playerCharacter,
-      this._logger,
-      previousSceneId, // ← Scène précédente
-      this._difficulty
-    );
-
-    // Copier l'état immutable
-    (newSession as any)._createdAt = this._createdAt;
-    (newSession as any)._lastSavedAt = this._lastSavedAt;
-    (newSession as any)._currentPhase = this._currentPhase;
-    (newSession as any)._gameTime = { ...this._gameTime };
-    (newSession as any)._flags = new Map(this._flags);
-    (newSession as any)._metrics = { ...this._metrics };
-    (newSession as any)._sceneHistory = newSceneHistory; // ← Historique immutable
-    (newSession as any)._companions = [...this._companions];
-    (newSession as any)._autoSaveEnabled = this._autoSaveEnabled;
-    (newSession as any)._autoSaveInterval = this._autoSaveInterval;
-
-    this._logger.game(`Navigation to previous scene: ${previousSceneId}`, { 
-      currentScene: this._currentSceneId,
-      historyLength: newSceneHistory.length
-    });
-
-    return newSession;
-  }
-
-  // BUSINESS RULES - Game State Management
-  
-  /**
-   * Retourne une nouvelle GameSession avec une phase mise à jour
-   * Respecte le principe d'immutabilité - Règle #2 ARCHITECTURE_GUIDELINES.md
-   */
-  public withPhase(newPhase: GamePhase): GameSession {
-    if (this._currentPhase === newPhase) {
-      return this;
-    }
-
-    const newSession = new GameSession(
-      this._sessionId,
-      this._playerCharacter,
-      this._logger,
-      this._currentSceneId,
-      this._difficulty
-    );
-
-    (newSession as any)._createdAt = this._createdAt;
-    (newSession as any)._lastSavedAt = this._lastSavedAt;
-    (newSession as any)._currentPhase = newPhase;
-    (newSession as any)._gameTime = { ...this._gameTime };
-    (newSession as any)._flags = new Map(this._flags);
-    (newSession as any)._metrics = { ...this._metrics };
-    (newSession as any)._sceneHistory = [...this._sceneHistory];
-    (newSession as any)._companions = [...this._companions];
-    (newSession as any)._autoSaveEnabled = this._autoSaveEnabled;
-    (newSession as any)._autoSaveInterval = this._autoSaveInterval;
-
-    return newSession;
-  }
-
-  /**
-   * Retourne une nouvelle GameSession avec le temps avancé
-   * Respecte le principe d'immutabilité - Règle #2 ARCHITECTURE_GUIDELINES.md
-   */
-  public withAdvancedTime(minutes: number): GameSession {
-    const oldTime = { ...this._gameTime };
-    const newTotalMinutes = oldTime.totalMinutes + minutes;
-    const newDay = Math.floor(newTotalMinutes / (24 * 60)) + 1;
-    const dayMinutes = newTotalMinutes % (24 * 60);
-    const newHour = Math.floor(dayMinutes / 60);
-    const newMinute = dayMinutes % 60;
-
-    const newGameTime: GameTime = {
-      totalMinutes: newTotalMinutes,
-      day: newDay,
-      hour: newHour,
-      minute: newMinute
-    };
-
-    const newSession = new GameSession(
-      this._sessionId,
-      this._playerCharacter,
-      this._logger,
-      this._currentSceneId,
-      this._difficulty
-    );
-
-    (newSession as any)._createdAt = this._createdAt;
-    (newSession as any)._lastSavedAt = this._lastSavedAt;
-    (newSession as any)._currentPhase = this._currentPhase;
-    (newSession as any)._gameTime = newGameTime;
-    (newSession as any)._flags = new Map(this._flags);
-    (newSession as any)._metrics = { ...this._metrics };
-    (newSession as any)._sceneHistory = [...this._sceneHistory];
-    (newSession as any)._companions = [...this._companions];
-    (newSession as any)._autoSaveEnabled = this._autoSaveEnabled;
-    (newSession as any)._autoSaveInterval = this._autoSaveInterval;
-
-    return newSession;
-  }
-
-  /**
-   * Retourne une nouvelle GameSession avec des métriques mises à jour
-   * Respecte le principe d'immutabilité - Règle #2 ARCHITECTURE_GUIDELINES.md
-   */
-  public withUpdatedMetrics(updates: Partial<GameMetrics>): GameSession {
-    const newMetrics = { ...this._metrics, ...updates };
-
-    const newSession = new GameSession(
-      this._sessionId,
-      this._playerCharacter,
-      this._logger,
-      this._currentSceneId,
-      this._difficulty
-    );
-
-    (newSession as any)._createdAt = this._createdAt;
-    (newSession as any)._lastSavedAt = this._lastSavedAt;
-    (newSession as any)._currentPhase = this._currentPhase;
-    (newSession as any)._gameTime = { ...this._gameTime };
-    (newSession as any)._flags = new Map(this._flags);
-    (newSession as any)._metrics = newMetrics;
-    (newSession as any)._sceneHistory = [...this._sceneHistory];
-    (newSession as any)._companions = [...this._companions];
-    (newSession as any)._autoSaveEnabled = this._autoSaveEnabled;
-    (newSession as any)._autoSaveInterval = this._autoSaveInterval;
-
-    return newSession;
-  }
-
-  /**
-   * Retourne une nouvelle GameSession avec timestamp de sauvegarde
-   * Respecte le principe d'immutabilité - Règle #2 ARCHITECTURE_GUIDELINES.md
-   */
-  public withSavedTimestamp(): GameSession {
-    const newSession = new GameSession(
-      this._sessionId,
-      this._playerCharacter,
-      this._logger,
-      this._currentSceneId,
-      this._difficulty
-    );
-
-    (newSession as any)._createdAt = this._createdAt;
-    (newSession as any)._lastSavedAt = new Date();
-    (newSession as any)._currentPhase = this._currentPhase;
-    (newSession as any)._gameTime = { ...this._gameTime };
-    (newSession as any)._flags = new Map(this._flags);
-    (newSession as any)._metrics = { ...this._metrics };
-    (newSession as any)._sceneHistory = [...this._sceneHistory];
-    (newSession as any)._companions = [...this._companions];
-    (newSession as any)._autoSaveEnabled = this._autoSaveEnabled;
-    (newSession as any)._autoSaveInterval = this._autoSaveInterval;
-
-    return newSession;
-  }
-
-  /**
-   * Retourne une nouvelle GameSession avec configuration auto-save
-   * Respecte le principe d'immutabilité - Règle #2 ARCHITECTURE_GUIDELINES.md
-   */
-  public withAutoSaveConfig(enabled: boolean, intervalMinutes: number): GameSession {
-    const newSession = new GameSession(
-      this._sessionId,
-      this._playerCharacter,
-      this._logger,
-      this._currentSceneId,
-      this._difficulty
-    );
-
-    (newSession as any)._createdAt = this._createdAt;
-    (newSession as any)._lastSavedAt = this._lastSavedAt;
-    (newSession as any)._currentPhase = this._currentPhase;
-    (newSession as any)._gameTime = { ...this._gameTime };
-    (newSession as any)._flags = new Map(this._flags);
-    (newSession as any)._metrics = { ...this._metrics };
-    (newSession as any)._sceneHistory = [...this._sceneHistory];
-    (newSession as any)._companions = [...this._companions];
-    (newSession as any)._autoSaveEnabled = enabled;
-    (newSession as any)._autoSaveInterval = Math.max(1, intervalMinutes);
-
-    return newSession;
-  }
-  
   /**
    * Vérifier si une scène a été visitée
    */
   hasVisitedScene(sceneId: string): boolean {
-    return this._sceneHistory.includes(sceneId) || this._currentSceneId === sceneId;
+    return this.sceneHistory.includes(sceneId) || this.currentSceneId === sceneId;
   }
-  
+
   /**
    * Obtenir la scène précédente
    */
   getPreviousScene(): string | undefined {
-    return this._sceneHistory[this._sceneHistory.length - 1];
+    return this.sceneHistory[this.sceneHistory.length - 1];
   }
-  
-  // BUSINESS RULES - Time Management
-  
-  /**
-   * Avancer le temps du jeu
-   */
-  advanceTime(minutes: number): GameSession {
-    return this.withAdvancedTime(minutes);
-  }
-  
-  /**
-   * Obtenir l'heure formatée
-   */
-  getFormattedTime(): string {
-    const h = this._gameTime.hour.toString().padStart(2, '0');
-    const m = this._gameTime.minute.toString().padStart(2, '0');
-    return `Jour ${this._gameTime.day} - ${h}:${m}`;
-  }
-  
-  /**
-   * Obtenir la période de la journée
-   */
-  getTimeOfDay(): 'dawn' | 'day' | 'dusk' | 'night' {
-    const hour = this._gameTime.hour;
-    if (hour >= 5 && hour < 8) return 'dawn';
-    if (hour >= 8 && hour < 18) return 'day';
-    if (hour >= 18 && hour < 21) return 'dusk';
-    return 'night';
-  }
-  
-  // BUSINESS RULES - Flags Management
-  
-  /**
-   * Définir un flag
-   */
-  setFlag(key: string, value: boolean | number | string): void {
-    const oldValue = this._flags.get(key);
-    this._flags.set(key, value);
-    
-    this._logger.game(`Flag set: ${key}`, { 
-      oldValue, 
-      newValue: value 
-    });
-  }
-  
+
   /**
    * Obtenir un flag
    */
   getFlag(key: string): boolean | number | string | undefined {
-    return this._flags.get(key);
+    return this.flags.get(key);
   }
-  
+
   /**
    * Vérifier si un flag existe et est vrai
    */
   hasFlag(key: string): boolean {
-    const value = this._flags.get(key);
-    return value === true;
+    return this.flags.get(key) === true;
   }
-  
+
   /**
    * Obtenir tous les flags
    */
   getAllFlags(): GameFlags {
-    const flags: GameFlags = {};
-    for (const [key, value] of this._flags.entries()) {
+    const flags: { [key: string]: boolean | number | string } = {};
+    this.flags.forEach((value, key) => {
       flags[key] = value;
-    }
-    return flags;
-  }
-  
-  // BUSINESS RULES - Metrics
-  
-  /**
-   * Incrémenter une métrique
-   */
-  incrementMetric(metric: keyof GameMetrics, amount: number = 1): GameSession {
-    const updates = {
-      [metric]: this._metrics[metric] + amount
-    };
-    return this.withUpdatedMetrics(updates);
-  }
-  
-  // BUSINESS RULES - Party Management
-  
-  /**
-   * Retourne une nouvelle GameSession avec un compagnon ajouté
-   * Respecte le principe d'immutabilité - Règle #2 ARCHITECTURE_GUIDELINES.md
-   */
-  public withAddedCompanion(companion: Character): GameSession {
-    // Vérifier si le compagnon existe déjà
-    if (this._companions.find(c => c.id === companion.id)) {
-      return this; // Pas de changement, retourner la même instance
-    }
-
-    // Créer un nouveau tableau de compagnons sans mutation
-    const newCompanions = [...this._companions, companion];
-
-    // Créer une nouvelle instance avec le nouveau compagnon
-    const newSession = new GameSession(
-      this._sessionId,
-      this._playerCharacter,
-      this._logger,
-      this._currentSceneId,
-      this._difficulty
-    );
-
-    // Copier l'état immutable
-    (newSession as any)._createdAt = this._createdAt;
-    (newSession as any)._lastSavedAt = this._lastSavedAt;
-    (newSession as any)._currentPhase = this._currentPhase;
-    (newSession as any)._gameTime = { ...this._gameTime };
-    (newSession as any)._flags = new Map(this._flags);
-    (newSession as any)._metrics = { ...this._metrics };
-    (newSession as any)._sceneHistory = [...this._sceneHistory];
-    (newSession as any)._companions = newCompanions; // ← Compagnons immutable
-    (newSession as any)._autoSaveEnabled = this._autoSaveEnabled;
-    (newSession as any)._autoSaveInterval = this._autoSaveInterval;
-
-    this._logger.game(`Companion added: ${companion.name}`, { 
-      companionId: companion.id,
-      partySize: newCompanions.length + 1 
     });
-
-    return newSession;
+    return flags as GameFlags;
   }
 
-  
-  /**
-   * Retourne une nouvelle GameSession avec un compagnon retiré
-   * Respecte le principe d'immutabilité - Règle #2 ARCHITECTURE_GUIDELINES.md
-   */
-  public withRemovedCompanion(companionId: string): GameSession {
-    const index = this._companions.findIndex(c => c.id === companionId);
-    if (index === -1) {
-      return this; // Compagnon non trouvé, retourner la même instance
-    }
-
-    const companion = this._companions[index];
-    
-    // Créer un nouveau tableau de compagnons sans le compagnon retiré (immutable)
-    const newCompanions = this._companions.filter(c => c.id !== companionId);
-
-    // Créer une nouvelle instance sans le compagnon
-    const newSession = new GameSession(
-      this._sessionId,
-      this._playerCharacter,
-      this._logger,
-      this._currentSceneId,
-      this._difficulty
-    );
-
-    // Copier l'état immutable
-    (newSession as any)._createdAt = this._createdAt;
-    (newSession as any)._lastSavedAt = this._lastSavedAt;
-    (newSession as any)._currentPhase = this._currentPhase;
-    (newSession as any)._gameTime = { ...this._gameTime };
-    (newSession as any)._flags = new Map(this._flags);
-    (newSession as any)._metrics = { ...this._metrics };
-    (newSession as any)._sceneHistory = [...this._sceneHistory];
-    (newSession as any)._companions = newCompanions; // ← Compagnons immutable
-    (newSession as any)._autoSaveEnabled = this._autoSaveEnabled;
-    (newSession as any)._autoSaveInterval = this._autoSaveInterval;
-
-    this._logger.game(`Companion removed: ${companion.name}`, { 
-      companionId,
-      partySize: newCompanions.length + 1 
-    });
-
-    return newSession;
-  }
-
-  
   /**
    * Obtenir tous les personnages (joueur + compagnons)
    */
   getAllCharacters(): Character[] {
-    return [this._playerCharacter, ...this._companions];
+    return [this.playerCharacter, ...this.companions];
   }
-  
+
   /**
    * Obtenir les personnages vivants
    */
   getAliveCharacters(): Character[] {
     return this.getAllCharacters().filter(c => c.isAlive);
   }
-  
-  // BUSINESS RULES - Save System
-  
+
   /**
-   * Marquer comme sauvegardé
+   * Obtenir l'heure formatée
    */
-  markAsSaved(): GameSession {
-    return this.withSavedTimestamp();
+  getFormattedTime(): string {
+    const h = this.gameTime.hour.toString().padStart(2, '0');
+    const m = this.gameTime.minute.toString().padStart(2, '0');
+    return `Jour ${this.gameTime.day} - ${h}:${m}`;
   }
-  
+
+  /**
+   * Obtenir la période de la journée
+   */
+  getTimeOfDay(): 'dawn' | 'day' | 'dusk' | 'night' {
+    const hour = this.gameTime.hour;
+    if (hour >= 5 && hour < 8) return 'dawn';
+    if (hour >= 8 && hour < 18) return 'day';
+    if (hour >= 18 && hour < 21) return 'dusk';
+    return 'night';
+  }
+
   /**
    * Vérifier si la session a besoin d'être sauvegardée
    */
   needsSaving(): boolean {
-    if (!this._lastSavedAt) return true;
+    if (!this.lastSavedAt) return true;
     
-    const timeSinceSave = Date.now() - this._lastSavedAt.getTime();
-    const autoSaveThreshold = this._autoSaveInterval * 60 * 1000; // Convertir en millisecondes
+    const timeSinceSave = Date.now() - this.lastSavedAt.getTime();
+    const autoSaveThreshold = this.autoSaveInterval * 60 * 1000;
     
     return timeSinceSave >= autoSaveThreshold;
   }
-  
+
   /**
    * Obtenir les métadonnées de sauvegarde
    */
   getSaveMetadata(): SaveMetadata {
     return {
-      saveId: this._sessionId,
-      characterName: this._playerCharacter.name,
-      lastSaved: this._lastSavedAt || this._createdAt,
+      saveId: this.sessionId,
+      characterName: this.playerCharacter.name,
+      lastSaved: this.lastSavedAt || this.createdAt,
       gameVersion: '2.6.0',
-      currentSceneTitle: `Scene ${this._currentSceneId}`, // Sera enrichi plus tard avec le vrai titre
-      totalPlayTime: this._metrics.timePlayedMinutes
+      currentSceneTitle: `Scene ${this.currentSceneId}`,
+      totalPlayTime: this.metrics.timePlayedMinutes
     };
   }
-  
-  /**
-   * Configurer la sauvegarde automatique
-   */
-  configureAutoSave(enabled: boolean, intervalMinutes: number = 5): GameSession {
-    return this.withAutoSaveConfig(enabled, intervalMinutes);
-  }
-  
-  // BUSINESS RULES - Game State Validation
-  
+
   /**
    * Vérifier si la session de jeu est valide
    */
   isValid(): { valid: boolean; reasons: string[] } {
     const reasons: string[] = [];
     
-    // Vérifier le personnage joueur
-    if (!this._playerCharacter.isAlive) {
+    if (!this.playerCharacter.isAlive) {
       reasons.push('Player character is dead');
     }
     
-    // Vérifier l'ID de scène
-    if (!this._currentSceneId || this._currentSceneId.trim().length === 0) {
+    if (!this.currentSceneId || this.currentSceneId.trim().length === 0) {
       reasons.push('Invalid current scene ID');
     }
     
-    // Vérifier les métriques
-    if (this._metrics.timePlayedMinutes < 0) {
+    if (this.metrics.timePlayedMinutes < 0) {
       reasons.push('Invalid play time');
     }
     
-    return {
-      valid: reasons.length === 0,
-      reasons
-    };
+    return { valid: reasons.length === 0, reasons };
   }
-  
+
   /**
    * Vérifier si le jeu est terminé
    */
   isGameOver(): boolean {
-    return this._currentPhase === 'game_over' || 
-           !this._playerCharacter.isAlive ||
+    return this.currentPhase === 'game_over' || 
+           !this.playerCharacter.isAlive ||
            this.getAllCharacters().every(c => !c.isAlive);
   }
 }
-

@@ -3,11 +3,23 @@
  * Exports centralisés des types du domaine
  */
 
+// === TYPES CENTRALISÉS (source unique de vérité) ===
+export type {
+  Position,
+  GridPosition,
+  AbilityScores,
+  DamageType,
+  AttackType,
+  WeaponCategory,
+  ItemRarity,
+  Range,
+  Damage
+} from './core';
+
+// === TYPES SPÉCIALISÉS ===
 // Character types
 export type {
-  AbilityScores,
   InventorySpec,
-  Position as CharacterPosition,
   CharacterCreationProps,
   ClassSpec,
   EnemySpec
@@ -15,7 +27,6 @@ export type {
 
 // Combat types
 export type {
-  Position as CombatPosition,
   CombatPhase,
   ActionType,
   CombatStats,
@@ -28,6 +39,3 @@ export type {
   DomainEnemyDataSource,
   DomainEnemyTemplate
 } from './Enemy';
-
-// Re-export Position sous un nom unifié
-export type { Position } from './Combat';

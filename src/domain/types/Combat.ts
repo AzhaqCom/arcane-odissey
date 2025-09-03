@@ -4,14 +4,6 @@
  */
 
 /**
- * Position sur la grille tactique
- */
-export interface Position {
-  readonly x: number;
-  readonly y: number;
-}
-
-/**
  * Phases du combat dans le domaine
  */
 export type CombatPhase = 'setup' | 'combat' | 'victory' | 'defeat';

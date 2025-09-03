@@ -4,18 +4,10 @@
  */
 
 import { Weapon } from '../../domain/entities/Weapon';
+import type { IWeaponRepository } from '../../domain/repositories/IWeaponRepository';
 import { GameDataStore } from '../stores/GameDataStore';
 import { logger } from '../services/Logger';
 import type { WeaponData } from '../data/types/WeaponData';
-
-export interface IWeaponRepository {
-  getWeapon(id: string): Weapon | null;
-  getAllWeapons(): Weapon[];
-  getWeaponsByIds(ids: string[]): Weapon[];
-  getWeaponsByCategory(category: 'melee' | 'ranged'): Weapon[];
-  getWeaponsByRarity(rarity: string): Weapon[];
-  searchWeapons(query: string): Weapon[];
-}
 
 /**
  * Repository des armes

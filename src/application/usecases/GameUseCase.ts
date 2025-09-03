@@ -90,8 +90,8 @@ export class GameUseCase {
         request.difficulty || 'normal'
       );
 
-      // Passer à la phase de navigation
-      this.currentSession.changePhase('scene_navigation');
+      // Passer à la phase de navigation (pattern immutable)
+      this.currentSession = this.currentSession.withPhase('scene_navigation');
 
       logger.game('Game session initialized', {
         sessionId: this.currentSession.sessionId,
@@ -267,16 +267,16 @@ export class GameUseCase {
       const effectsRemoved: string[] = []; // TODO: implémenter la gestion des effets
 
       // Avancer le temps
-      this.currentSession.advanceTime(timeAdvanced);
+      this.currentSession = this.currentSession.withAdvancedTime(timeAdvanced);
 
-      // Changer de phase temporairement
+      // Changer de phase temporairement (pattern immutable)
       const originalPhase = this.currentSession.currentPhase;
-      this.currentSession.changePhase('rest');
+      this.currentSession = this.currentSession.withPhase('rest');
       
       // Revenir à la phase précédente après le repos
       setTimeout(() => {
         if (this.currentSession) {
-          this.currentSession.changePhase(originalPhase);
+          this.currentSession = this.currentSession.withPhase(originalPhase);
         }
       }, 0);
 
@@ -318,7 +318,7 @@ export class GameUseCase {
     }
 
     try {
-      this.currentSession.markAsSaved();
+      this.currentSession = this.currentSession.withSaveTimestamp();
       
       // TODO: Implémenter la vraie sauvegarde via GameSessionRepository
       logger.game('Game saved', {
@@ -432,7 +432,7 @@ export class GameUseCase {
     switch (effect.type) {
       case 'gain_xp':
         const xp = parseInt(effect.value);
-        this.currentSession.incrementMetric('experienceGained', xp);
+        this.currentSession = this.currentSession.withIncrementedMetric('experienceGained', xp);
         // TODO: Implémenter le gain XP sur le personnage
         break;
 
@@ -442,12 +442,12 @@ export class GameUseCase {
 
       case 'add_item':
         // TODO: Ajouter item à l'inventaire
-        this.currentSession.incrementMetric('itemsFound');
+        this.currentSession = this.currentSession.withIncrementedMetric('itemsFound', 1);
         break;
 
       case 'advance_time':
         const minutes = parseInt(effect.value);
-        this.currentSession.advanceTime(minutes);
+        this.currentSession = this.currentSession.withAdvancedTime(minutes);
         break;
 
       case 'add_buff':
@@ -467,13 +467,13 @@ export class GameUseCase {
 
     switch (sceneType) {
       case 'combat':
-        this.currentSession.changePhase('combat');
+        this.currentSession = this.currentSession.withPhase('combat');
         break;
       case 'dialogue':
-        this.currentSession.changePhase('dialogue');
+        this.currentSession = this.currentSession.withPhase('dialogue');
         break;
       default:
-        this.currentSession.changePhase('scene_navigation');
+        this.currentSession = this.currentSession.withPhase('scene_navigation');
     }
   }
 

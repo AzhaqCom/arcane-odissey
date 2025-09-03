@@ -2,7 +2,8 @@
  * DOMAIN ENTITY - Character
  * Logique métier pure pour un personnage, sans dépendances infrastructure.
  */
-import type { AbilityScores, InventorySpec, Position, CharacterCreationProps, ClassSpec } from '../types/Character';
+import type { AbilityScores, Position } from '../types/core';
+import type { InventorySpec, CharacterCreationProps, ClassSpec } from '../types/Character';
 import { SpellSlots } from './Spell';
 
 // Constantes de progression (déplacées dans le domaine)

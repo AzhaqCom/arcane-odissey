@@ -34,7 +34,38 @@ La séparation des couches n'est pas une suggestion, c'est une règle absolue.
    Le code de production ne doit contenir aucun `console.log`. Utiliser le service de `Logger` fourni par l'infrastructure.
 
 ---
+ CONSTITUTION ARCHITECTURALE DU PROJET
 
+  Règle #1 : Le Domaine est Roi (Domain-Centric)
+   * Toute nouvelle règle métier, logique de jeu ou calcul (ex: effets de statut, règles de furtivité, etc.) DOIT être
+     implémentée dans la couche Domain.
+   * Les entités (Combat, Character) sont les gardiennes des règles. Elles doivent être "riches" et contenir cette logique.
+   * La couche Application (UseCases, Services) ne contient JAMAIS de logique métier. Son seul rôle est d'orchestrer les appels
+     au domaine.
+
+  Règle #2 : L'Orchestration est Stupide (Thin Application Layer)
+   * Toute méthode d'un UseCase ou Service d'application qui modifie l'état du domaine DOIT suivre le pattern "3 lignes" :
+       1. Appeler la méthode du domaine (const result = domain.doSomething()).
+       2. Sauvegarder le nouvel état retourné (await repository.save(result.newState)).
+       3. Retourner le résultat de l'action (return result.outcome).
+
+  Règle #3 : La Présentation est Ignorante (Dumb Presentation)
+   * La couche Présentation (composants React) ne communique JAMAIS directement avec les UseCases ou le Domaine.
+   * Toute interaction entre l'UI et l'application passe EXCLUSIVEMENT par un hook React dédié (ex: useCombat,
+     useCharacterSheet).
+   * Les composants sont "stupides" : ils reçoivent des données et des fonctions via leurs props et se contentent de faire du
+     rendu.
+
+  Règle #4 : Tout est Pur et Immuable (Purity & Immutability)
+   * Tous les états du domaine (Combat, Character, etc.) sont immuables. Toute modification retourne une NOUVELLE instance via
+     une méthode with...().
+   * Les services du domaine sont purs. Toute dépendance (ex: DiceRollingService) est injectée via le constructeur. Aucun appel
+     statique, aucun effet de bord caché.
+
+  Règle #5 : L'Injection est la Loi (Dependency Injection)
+   * Toute dépendance (Repository, Service) est TOUJOURS injectée via le constructeur. Le DIContainer est la seule source de
+     vérité pour la création d'objets complexes.
+     
 ## 3. WORKFLOW OBLIGATOIRE
 
 Pour toute demande de modification ou d'ajout de fonctionnalité, le workflow suivant est requis :

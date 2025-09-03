@@ -3,17 +3,7 @@
  * Types purs du domaine, sans dépendances infrastructure
  */
 
-/**
- * Scores de capacités standard D&D 5e
- */
-export interface AbilityScores {
-  readonly strength: number;
-  readonly dexterity: number;
-  readonly constitution: number;
-  readonly intelligence: number;
-  readonly wisdom: number;
-  readonly charisma: number;
-}
+import type { AbilityScores, Position } from './core';
 
 /**
  * Structure d'inventaire pure (domaine)
@@ -26,14 +16,6 @@ export interface InventorySpec {
   }>;
   // PHASE 1 - Ajout propriété weapons pour compatibilité
   readonly weapons?: ReadonlyArray<string>; // weaponIds équipées
-}
-
-/**
- * Position dans le monde de jeu
- */
-export interface Position {
-  readonly x: number;
-  readonly y: number;
 }
 
 /**

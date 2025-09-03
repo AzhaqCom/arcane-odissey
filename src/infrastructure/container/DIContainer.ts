@@ -3,7 +3,7 @@
  * Container étendu pour gérer toutes les dépendances
  */
 
-import { CombatUseCase } from '../../application/usecases/CombatUseCase';
+import { CombatGameUseCase } from '../../application/usecases/CombatGameUseCase';
 import { SceneUseCase } from '../../application/usecases/SceneUseCase';
 import { GameUseCase } from '../../application/usecases/GameUseCase';
 // InMemoryRepositories supprimés - utilisation des repositories modernes uniquement
@@ -25,44 +25,13 @@ import { AbilityCalculationService } from '../../domain/services/AbilityCalculat
 import { InitiativeService } from '../../domain/services/InitiativeService';
 import { TacticalCalculationService } from '../../domain/services/TacticalCalculationService';
 import { GameNarrativeService } from '../../domain/services/GameNarrativeService';
-import { ActionPrioritizer } from '../../domain/entities/ActionPrioritizer';
-import { ThreatAssessment } from '../../domain/entities/ThreatAssessment';
-import { CombatActionService } from '../../domain/services/CombatActionService';
+// ActionPrioritizer et ThreatAssessment supprimés (incompatibles avec Phoenix)
+import { SimpleAIService } from '../../domain/services/SimpleAIService';
 import type { IRandomNumberGenerator } from '../../domain/services/DiceRollingService';
-import { Combat } from '../../domain/entities/Combat';
-import { CombatSession } from '../../domain/entities/CombatSession';
+// import { Combat } from '../../domain/entities/Combat'; // ✅ SUPPRIMÉ - Utilise CombatEngine maintenant
 
-// Création d'un CombatRepository temporaire (en attendant implémentation propre)
-class TempCombatRepository {
-  private currentCombat: any = null;
-  private currentSession: CombatSession | null = null;
-
-  // Legacy methods
-  async getCombat() { return this.currentCombat; }
-  async saveCombat(combat: any) { this.currentCombat = combat; }
-
-  // New session methods
-  async getActiveSession(): Promise<CombatSession | null> { 
-    return this.currentSession; 
-  }
-  
-  async saveSession(session: CombatSession): Promise<void> { 
-    this.currentSession = session;
-    // Maintenir compatibilité legacy
-    this.currentCombat = session.combat;
-  }
-  
-  async endActiveSession(): Promise<void> { 
-    this.currentSession = null;
-    this.currentCombat = null;
-  }
-}
-
-// Création d'un EffectsRepository temporaire
-class TempEffectsRepository {
-  async getEffectsManager() { return {}; }
-  async saveEffects() { }
-}
+// NOUVEAU SYSTÈME - Plus de repositories temporaires nécessaires
+// Le CombatEngine gère son propre état immutable
 
 // Implémentation production de IRandomNumberGenerator
 class ProductionRandomNumberGenerator implements IRandomNumberGenerator {
@@ -122,28 +91,22 @@ export class DIContainer {
 
     logger.debug('DI_CONTAINER', 'Stores initialized', gameDataStore.getStoreStats());
 
-    // ===== REPOSITORIES UNIFIÉS =====
+    // ===== REPOSITORIES ESSENTIELS =====
     const weaponRepository = new WeaponRepository(gameDataStore);
     const spellRepository = new SpellRepository(gameDataStore);
     const characterRepository = new CharacterRepository(gameDataStore, saveGameStore);
     const sceneRepository = new SceneRepository();
     const gameSessionRepository = new GameSessionRepository();
 
-    // Repositories temporaires (transition)
-    const combatRepository = new TempCombatRepository();
-    const effectsRepository = new TempEffectsRepository();
-
     this.register('WeaponRepository', weaponRepository);
     this.register('SpellRepository', spellRepository);
     this.register('CharacterRepository', characterRepository);
     this.register('SceneRepository', sceneRepository);
     this.register('GameSessionRepository', gameSessionRepository);
-    this.register('CombatRepository', combatRepository);
-    this.register('EffectsRepository', effectsRepository);
 
     logger.debug('DI_CONTAINER', 'Unified repositories initialized');
 
-    // ===== SERVICES DOMAIN =====
+    // ===== SERVICES DOMAIN (SIMPLIFIÉS) =====
     const randomGenerator = new ProductionRandomNumberGenerator();
     const diceRollingService = new DiceRollingService(randomGenerator);
     const damageCalculationService = new DamageCalculationService(diceRollingService);
@@ -151,37 +114,27 @@ export class DIContainer {
     const initiativeService = new InitiativeService(diceRollingService);
     const tacticalCalculationService = new TacticalCalculationService();
     const gameNarrativeService = new GameNarrativeService(diceRollingService);
-    const actionPrioritizer = new ActionPrioritizer(diceRollingService);
-    const threatAssessment = new ThreatAssessment(diceRollingService);
-    const combatActionService = new CombatActionService(diceRollingService);
+    
+    // ✅ NOUVEAU SYSTÈME AI SIMPLIFIÉ
+    const simpleAIService = new SimpleAIService(diceRollingService, logger);
 
+    // Services essentiels seulement
     this.register('DiceRollingService', diceRollingService);
     this.register('DamageCalculationService', damageCalculationService);
     this.register('AbilityCalculationService', abilityCalculationService);
     this.register('InitiativeService', initiativeService);
     this.register('TacticalCalculationService', tacticalCalculationService);
     this.register('GameNarrativeService', gameNarrativeService);
-    this.register('ActionPrioritizer', actionPrioritizer);
-    this.register('ThreatAssessment', threatAssessment);
-    this.register('CombatActionService', combatActionService);
+    this.register('SimpleAIService', simpleAIService);
 
     logger.debug('DI_CONTAINER', 'Domain services initialized');
 
-    // ===== USE CASES UNIFIÉS =====
-    const combatUseCase = new CombatUseCase(
-      combatRepository, 
-      characterRepository, 
-      gameNarrativeService,
-      diceRollingService,
-      initiativeService,
-      this.createCombat.bind(this),
-      effectsRepository, 
-      weaponRepository
-    );
+    // ===== USE CASES SIMPLIFIÉS =====
+    const combatGameUseCase = new CombatGameUseCase(simpleAIService, logger);
     const sceneUseCase = new SceneUseCase(sceneRepository);
-    const gameUseCase = new GameUseCase(sceneUseCase, characterRepository); // Repository unifié
+    const gameUseCase = new GameUseCase(sceneUseCase, characterRepository);
 
-    this.register('CombatUseCase', combatUseCase);
+    this.register('CombatGameUseCase', combatGameUseCase);
     this.register('SceneUseCase', sceneUseCase);
     this.register('GameUseCase', gameUseCase);
 
@@ -189,25 +142,15 @@ export class DIContainer {
   }
 
   /**
-   * Factory pour créer Combat avec dépendances injectées
+   * Factory pour créer les dépendances CombatEngine
    */
-  createCombat(id: string, gridDimensions?: any): Combat {
-    const dependencies = {
+  createCombatDependencies() {
+    return {
       diceRollingService: this.get<DiceRollingService>('DiceRollingService'),
       damageCalculationService: this.get<DamageCalculationService>('DamageCalculationService'),
-      abilityCalculationService: this.get<AbilityCalculationService>('AbilityCalculationService'),
-      initiativeService: this.get<InitiativeService>('InitiativeService'),
-      tacticalCalculationService: this.get<TacticalCalculationService>('TacticalCalculationService'),
-      actionPrioritizer: this.get<ActionPrioritizer>('ActionPrioritizer'),
-      threatAssessment: this.get<ThreatAssessment>('ThreatAssessment'),
-      combatActionService: this.get<CombatActionService>('CombatActionService')
+      logger: logger
     };
-
-    return new Combat(id, gridDimensions, dependencies);
   }
-
-  // PHASE 2 - Getters statiques supprimés pour éviter les dépendances circulaires
-  // Les services sont maintenant injectés directement dans les constructeurs
 }
 
 // Tokens pour l'injection
@@ -216,28 +159,24 @@ export const TOKENS = {
   GameDataStore: 'GameDataStore',
   SaveGameStore: 'SaveGameStore',
 
-  // Repositories Unifiés
+  // Repositories Essentiels
   WeaponRepository: 'WeaponRepository',
   SpellRepository: 'SpellRepository',
   CharacterRepository: 'CharacterRepository',
   SceneRepository: 'SceneRepository',
   GameSessionRepository: 'GameSessionRepository',
-  CombatRepository: 'CombatRepository',
-  EffectsRepository: 'EffectsRepository',
 
-  // Services Domain
+  // Services Domain Simplifiés
   DiceRollingService: 'DiceRollingService',
   DamageCalculationService: 'DamageCalculationService',
   AbilityCalculationService: 'AbilityCalculationService',
   InitiativeService: 'InitiativeService',
   TacticalCalculationService: 'TacticalCalculationService',
   GameNarrativeService: 'GameNarrativeService',
-  ActionPrioritizer: 'ActionPrioritizer',
-  ThreatAssessment: 'ThreatAssessment',
-  CombatActionService: 'CombatActionService',
+  SimpleAIService: 'SimpleAIService',
 
-  // Use Cases
-  CombatUseCase: 'CombatUseCase',
+  // Use Cases Simplifiés
+  CombatGameUseCase: 'CombatGameUseCase',
   SceneUseCase: 'SceneUseCase',
   GameUseCase: 'GameUseCase'
 } as const;

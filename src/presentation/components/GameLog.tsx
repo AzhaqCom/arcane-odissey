@@ -1,40 +1,38 @@
 /**
  * PRESENTATION - GameLog Component
  * Journal narratif pur pour les événements du jeu D&D
- * Responsabilité : Affichage des messages pré-formatés uniquement
+ * Respecte ARCHITECTURE_GUIDELINES.md - Règle #3 Dumb Presentation
+ * ✅ Aucun import Domain/Application - Isolation complète
  */
 
 import React, { useEffect, useRef } from 'react';
-import type { NarrativeMessage, MessageType } from '../../domain/entities/NarrativeMessage';
-import { DIContainer } from '../../infrastructure/container/DIContainer';
-import type { GameNarrativeService } from '../../domain/services/GameNarrativeService';
-
-interface GameLogProps {
-  messages: NarrativeMessage[];
-  maxMessages?: number;
-  height?: string;
-}
+import type { 
+  NarrativeMessageView, 
+  MessageTypeView, 
+  GameLogProps 
+} from '../types/NarrativeTypes';
 
 export const GameLog: React.FC<GameLogProps> = ({ 
-  messages = [], // ← Protection contre undefined (défense en profondeur)
+  messages = [], 
   maxMessages = 15, 
-  height = '300px' 
+  height = '300px',
+  autoScroll = true
 }) => {
   const logRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll vers le bas à chaque nouveau message (logique UI pure)
   useEffect(() => {
-    if (logRef.current) {
+    if (autoScroll && logRef.current) {
       logRef.current.scrollTop = logRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, autoScroll]);
 
   // Limiter le nombre de messages affichés (logique UI pure)
   const displayedMessages = messages.slice(-maxMessages);
 
   // Styles par type de message (logique UI pure)
-  const getMessageStyle = (type: MessageType): React.CSSProperties => {
-    const styleMap: Record<MessageType, React.CSSProperties> = {
+  const getMessageStyle = (type: MessageTypeView): React.CSSProperties => {
+    const styleMap: Record<MessageTypeView, React.CSSProperties> = {
       'combat': { 
         color: '#d32f2f', 
         fontWeight: 'bold' 
@@ -75,9 +73,9 @@ export const GameLog: React.FC<GameLogProps> = ({
     };
   };
 
-  // Icônes par type de message (logique UI pure)
-  const getMessageIcon = (type: MessageType): string => {
-    const iconMap: Record<MessageType, string> = {
+  // Icônes par type de message (logique UI pure)  
+  const getMessageIcon = (type: MessageTypeView): string => {
+    const iconMap: Record<MessageTypeView, string> = {
       'combat': '⚔️',
       'damage': '💥',
       'healing': '💚',
@@ -107,8 +105,8 @@ export const GameLog: React.FC<GameLogProps> = ({
               <span className="log-timestamp">
                 {message.timestamp.toLocaleTimeString()}
               </span>
-              <span className="log-icon">{getMessageIcon(message.type)}</span>
-              <span className="log-content">{message.content || (message as any).message || '[Message vide]'}</span>
+              <span className="log-icon">{message.icon || getMessageIcon(message.type)}</span>
+              <span className="log-content">{message.content}</span>
             </div>
           ))
         )}
@@ -119,20 +117,26 @@ export const GameLog: React.FC<GameLogProps> = ({
 
 /**
  * HOOK - useGameLog
- * Gestion simplifiée des messages narratifs pré-formatés
+ * ✅ Hook pur sans import Domain - Respecte ARCHITECTURE_GUIDELINES.md
+ * Gestion simplifiée des messages View Models uniquement
  */
 export const useGameLog = () => {
-  // Initialisation avec un message de bienvenue aléatoire
-  const [messages, setMessages] = React.useState<NarrativeMessage[]>(() => {
-    const gameNarrativeService = DIContainer.getInstance().get<GameNarrativeService>('GameNarrativeService');
-    return [gameNarrativeService.createWelcomeMessage()];
+  // Initialisation avec un message de bienvenue (View Model pur)
+  const [messages, setMessages] = React.useState<readonly NarrativeMessageView[]>(() => {
+    return [{
+      id: `welcome-${Date.now()}`,
+      content: 'Votre aventure commence...',
+      type: 'system',
+      timestamp: new Date(),
+      icon: '🌟'
+    }];
   });
 
-  const addMessage = React.useCallback((message: NarrativeMessage) => {
+  const addMessage = React.useCallback((message: NarrativeMessageView) => {
     setMessages(prev => [...prev, message]);
   }, []);
 
-  const addMessages = React.useCallback((newMessages: NarrativeMessage[]) => {
+  const addMessages = React.useCallback((newMessages: readonly NarrativeMessageView[]) => {
     setMessages(prev => [...prev, ...newMessages]);
   }, []);
 

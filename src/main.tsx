@@ -4,7 +4,5 @@ import './styles/index.css'
 import { GameApp } from './presentation/components/GameApp'
 
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <GameApp />
-  </StrictMode>,
+  <GameApp />
 )
