@@ -7,7 +7,7 @@
 export type {
   Position,
   GridPosition,
-  AbilityScores,
+  Stats,
   DamageType,
   AttackType,
   WeaponCategory,
@@ -39,3 +39,13 @@ export type {
   DomainEnemyDataSource,
   DomainEnemyTemplate
 } from './Enemy';
+
+// Combat Configuration types
+export type {
+  TerrainCell,
+  EnemySpawnSpec,
+  CombatSceneConfig,
+  CombatInitializationData,
+  CombatObjectives,
+  CombatRewards
+} from './CombatConfiguration';

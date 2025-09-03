@@ -3,7 +3,7 @@
  * Définit les règles et la progression pour chaque classe de personnage.
  */
 
-import type { AbilityScores } from './CharacterData';
+import type { Stats } from './CharacterData';
 
 export interface ClassFeature {
   readonly level: number;
@@ -16,7 +16,7 @@ export interface ClassData {
   readonly name: string; // "Guerrier", "Magicien"
   readonly hitDie: 6 | 8 | 10 | 12;
   readonly proficiencies: {
-    readonly savingThrows: ReadonlyArray<keyof AbilityScores>;
+    readonly savingThrows: ReadonlyArray<keyof Stats>;
     readonly armor: readonly string[]; // ex: "light", "medium"
     readonly weapons: readonly string[]; // ex: "simple", "martial"
   };

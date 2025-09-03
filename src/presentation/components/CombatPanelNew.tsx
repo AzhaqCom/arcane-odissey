@@ -6,14 +6,11 @@
  */
 
 import React from 'react';
-import type { CombatEntityView } from '../types/CombatTypes';
 import type { UseCombatGameResult } from '../hooks/useCombatGame';
-import { DIContainer } from '../../infrastructure/container/DIContainer';
 
 interface CombatPanelNewProps {
   // Interface simplifiée - toute la logique est dans le hook
   combat: UseCombatGameResult;
-  onCreateTestEntities: () => CombatEntityView[]; // Pour créer des entités de test
 }
 
 /**
@@ -24,8 +21,7 @@ interface CombatPanelNewProps {
  * ✅ Interface claire pour le joueur
  */
 export const CombatPanelNew: React.FC<CombatPanelNewProps> = ({
-  combat,
-  onCreateTestEntities
+  combat
 }) => {
   // === RENDU AVANT COMBAT ===
   const renderPreCombat = () => (
@@ -40,10 +36,8 @@ export const CombatPanelNew: React.FC<CombatPanelNewProps> = ({
         <button
           className="action-button start-button"
           onClick={() => {
-            const testEntities = onCreateTestEntities();
-            const container = DIContainer.getInstance();
-            const dependencies = container.createCombatDependencies();
-            combat.startCombat(testEntities, dependencies);
+            // ✅ ARCHITECTURE PROPRE - Utilise le hook qui gère tout
+            combat.initializeCombatFromScene('forest_ambush');
           }}
           style={{
             padding: '12px 24px',
@@ -62,6 +56,154 @@ export const CombatPanelNew: React.FC<CombatPanelNewProps> = ({
           🚀 Démarrer Combat
         </button>
       </div>
+    </div>
+  );
+
+  // ✅ FONCTIONNALITÉ 1.1 - Fonctions de rendu par catégorie
+  const renderActionCategory = (title: string, actions: React.ReactNode) => (
+    <div className="action-category" style={{ marginBottom: '15px' }}>
+      <div className="category-header" style={{ 
+        marginBottom: '8px', 
+        paddingBottom: '5px', 
+        borderBottom: '1px solid rgba(255, 255, 255, 0.1)' 
+      }}>
+        <h4 style={{ color: '#60a5fa', margin: 0, fontSize: '14px' }}>{title}</h4>
+      </div>
+      <div className="category-actions" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {actions}
+      </div>
+    </div>
+  );
+
+  const renderCombatActions = () => {
+    if (!combat.currentEntity || combat.playerActionContext.state === 'AWAITING_ATTACK_TARGET') {
+      return renderTargetSelection();
+    }
+
+    return (
+      <>
+        <button
+          className="action-button combat-button"
+          onClick={() => combat.selectAttackAction()}
+          disabled={!combat.currentEntity?.actionsRemaining.action}
+          style={{
+            width: '100%',
+            padding: '8px 12px',
+            backgroundColor: combat.currentEntity?.actionsRemaining.action ? '#d32f2f' : '#666',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: combat.currentEntity?.actionsRemaining.action ? 'pointer' : 'not-allowed',
+            fontSize: '13px'
+          }}
+        >
+          ⚔️ Attaquer
+        </button>
+        {/* TODO: Ajouter sélection d'armes spécifiques */}
+      </>
+    );
+  };
+
+  const renderMovementActions = () => {
+    if (combat.playerActionContext.state === 'AWAITING_MOVEMENT_CONFIRMATION') {
+      return (
+        <div style={{ color: '#FF9800', fontSize: '12px', textAlign: 'center', padding: '8px' }}>
+          🎯 Cliquez sur la grille pour vous déplacer
+        </div>
+      );
+    }
+
+    return (
+      <button
+        className="action-button movement-button"
+        onClick={() => combat.selectMoveAction()}
+        disabled={!combat.currentEntity?.actionsRemaining.movement}
+        style={{
+          width: '100%',
+          padding: '8px 12px',
+          backgroundColor: combat.currentEntity?.actionsRemaining.movement ? '#FF9800' : '#666',
+          color: 'white',
+          border: 'none',
+          borderRadius: '4px',
+          cursor: combat.currentEntity?.actionsRemaining.movement ? 'pointer' : 'not-allowed',
+          fontSize: '13px'
+        }}
+      >
+        🏃 Se déplacer ({combat.currentEntity?.actionsRemaining.movement || 0}m)
+      </button>
+    );
+  };
+
+  const renderSpellActions = () => {
+    // TODO: Implémenter sélection de sorts depuis Character
+    return (
+      <div style={{ color: '#888', fontSize: '12px', textAlign: 'center', padding: '8px' }}>
+        Sorts non disponibles
+      </div>
+    );
+  };
+
+  const renderTurnActions = () => (
+    <button
+      className="action-button end-turn-button"
+      onClick={() => combat.endTurn()}
+      style={{
+        width: '100%',
+        padding: '8px 12px',
+        backgroundColor: '#6c757d',
+        color: 'white',
+        border: 'none',
+        borderRadius: '4px',
+        cursor: 'pointer',
+        fontSize: '13px'
+      }}
+    >
+      ⏭️ Terminer le tour
+    </button>
+  );
+
+  const renderTargetSelection = () => (
+    <div className="target-selection">
+      <div style={{ color: '#FF5722', marginBottom: '8px', fontSize: '13px' }}>
+        Sélectionnez une cible :
+      </div>
+      {combat.validTargets.map(target => (
+        <button
+          key={target.id}
+          className="target-button"
+          onClick={() => combat.confirmAction(target.id)}
+          style={{
+            width: '100%',
+            padding: '6px 10px',
+            marginBottom: '4px',
+            backgroundColor: '#d32f2f',
+            color: 'white',
+            border: 'none',
+            borderRadius: '3px',
+            cursor: 'pointer',
+            fontSize: '12px',
+            textAlign: 'left'
+          }}
+        >
+          🎯 {target.name} ({target.hitPoints} PV)
+        </button>
+      ))}
+      <button
+        onClick={() => combat.cancelCurrentAction()}
+        style={{
+          width: '100%',
+          padding: '6px 10px',
+          marginTop: '8px',
+          backgroundColor: '#666',
+          color: 'white',
+          border: 'none',
+          borderRadius: '3px',
+          cursor: 'pointer',
+          fontSize: '12px'
+        }}
+      >
+        ❌ Annuler
+      </button>
     </div>
   );
 
@@ -89,89 +231,12 @@ export const CombatPanelNew: React.FC<CombatPanelNewProps> = ({
           </div>
         </div>
 
-        {/* Actions disponibles */}
-        <div className="combat-actions-list">
-          <div className="actions-category">
-            <h4 style={{ color: '#FFC107', marginBottom: '10px', fontSize: '14px' }}>⚔️ Actions</h4>
-          </div>
-          <div className="actions-buttons" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            
-            {availableActions.includes('attack') && validTargets.length > 0 && (
-              <div className="action-group">
-                <div className="action-subheader" style={{ color: '#FF5722', marginBottom: '8px', fontSize: '13px' }}>Cibles disponibles:</div>
-                {validTargets.map(target => (
-                  <button
-                    key={target.id}
-                    className="action-button weapon-button"
-                    onClick={() => combat.executeAttack(target.id)}
-                    style={{
-                      display: 'block',
-                      width: '100%',
-                      padding: '8px 12px',
-                      marginBottom: '5px',
-                      backgroundColor: '#d32f2f',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '13px',
-                      textAlign: 'left'
-                    }}
-                    onMouseOver={(e) => e.target.style.backgroundColor = '#b71c1c'}
-                    onMouseOut={(e) => e.target.style.backgroundColor = '#d32f2f'}
-                  >
-                    ⚔️ Attaquer {target.name} ({target.hitPoints} PV)
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {availableActions.includes('move') && (
-              <button
-                className="action-button movement-button"
-                onClick={() => {
-                  // TODO: Activer le mode mouvement sur la grille
-                  const randomX = Math.floor(Math.random() * 12);
-                  const randomY = Math.floor(Math.random() * 8);
-                  combat.executeMove({ x: randomX, y: randomY });
-                }}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  backgroundColor: '#FF9800',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '14px'
-                }}
-                onMouseOver={(e) => e.target.style.backgroundColor = '#F57C00'}
-                onMouseOut={(e) => e.target.style.backgroundColor = '#FF9800'}
-              >
-                🏃 Se déplacer ({currentEntity?.actionsRemaining.movement}m)
-              </button>
-            )}
-
-            <button
-              className="action-button end-turn-button"
-              onClick={() => combat.endTurn()}
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                marginTop: '10px',
-                backgroundColor: '#6c757d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '14px'
-              }}
-              onMouseOver={(e) => e.target.style.backgroundColor = '#5a6268'}
-              onMouseOut={(e) => e.target.style.backgroundColor = '#6c757d'}
-            >
-              ⏭️ Terminer le tour
-            </button>
-          </div>
+        {/* ✅ FONCTIONNALITÉ 1.1 - Interface selon mockups action_joueur.png */}
+        <div className="action-categories">
+          {renderActionCategory('⚔️ Combat', renderCombatActions())}
+          {renderActionCategory('🏃 Mouvement', renderMovementActions())}
+          {renderActionCategory('✨ Sorts', renderSpellActions())}
+          {renderActionCategory('⏭️ Tour', renderTurnActions())}
         </div>
       </div>
     );

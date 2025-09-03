@@ -8,13 +8,13 @@ import type {
   CharacterCreationProps, 
   ClassSpec, 
   InventorySpec, 
-  AbilityScores
+  Stats
   // Position - sera utilisé dans futures implémentations
 } from '../../domain/types';
 import type { 
   PlayerDataSource, 
   InventoryDataSource,
-  AbilityScores as InfraAbilityScores 
+  Stats as InfraStats 
 } from '../../infrastructure/data/types/CharacterData';
 import type { ClassData } from '../../infrastructure/data/types/ClassData';
 
@@ -36,7 +36,7 @@ export class CharacterMapper {
       xp: dataSource.xp,
       classId: dataSource.characterClassId,
       raceId: dataSource.raceId,
-      baseStats: this.mapAbilityScores(dataSource.baseAbilities),
+      baseStats: this.mapStats(dataSource.baseAbilities),
       inventory: this.mapInventory(dataSource.inventory),
       knownSpellIds: dataSource.knownSpellIds,
       currentHP: dataSource.savedState.currentHp,
@@ -90,7 +90,7 @@ export class CharacterMapper {
 
   // === MÉTHODES PRIVÉES ===
 
-  private static mapAbilityScores(infra: InfraAbilityScores): AbilityScores {
+  private static mapStats(infra: InfraStats): Stats {
     return {
       strength: infra.strength,
       dexterity: infra.dexterity,

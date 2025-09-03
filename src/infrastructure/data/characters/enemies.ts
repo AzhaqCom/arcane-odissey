@@ -1,97 +1,116 @@
 /**
  * INFRASTRUCTURE - Modèles (templates) pour les ennemis
+ * Utilise DomainEnemyTemplate pour compatibilité avec le Domain
  */
 
-// On définit un type pour nos modèles d'ennemis
-export interface EnemyTemplate {
-    readonly id: string; // "goblin_scout", "orc_berserker"
-    readonly name: string;
-    readonly level: number;
-    readonly baseAbilities: {
-        readonly strength: number;
-        readonly dexterity: number;
-        readonly constitution: number;
-        readonly intelligence: number;
-        readonly wisdom: number;
-        readonly charisma: number;
-    };
-    readonly maxHp: number;
-    readonly armorClass: number;
-    readonly speed: number;
-    readonly equipment: {
-        readonly weapons: readonly string[]; // IDs des armes depuis WEAPONS_DATA
-        readonly armor?: readonly string[];  // IDs des armures (optionnel)
-        readonly items?: readonly string[];  // Autres équipements (optionnel)
-    };
-    readonly specialAbilities?: readonly string[]; // Capacités uniques (souffle dragon, etc.)
-    readonly combatModifiers?: {
-        readonly attackBonus?: number;  // Bonus d'attaque spécifique
-        readonly damageBonus?: number;  // Bonus de dégâts spécifique
-        readonly resistances?: readonly string[]; // Résistances aux types de dégâts
-        readonly vulnerabilities?: readonly string[]; // Vulnérabilités
-    };
-    readonly aiProfile?: {
-        readonly behavior: 'aggressive' | 'defensive' | 'tactical' | 'cowardly';
-        readonly preferredRange: 'melee' | 'ranged' | 'mixed';
-        readonly aggroRadius?: number;
-    };
-    readonly lootTable?: ReadonlyArray<{ itemId: string; dropChance: number; }>;
-}
+import type { DomainEnemyTemplate } from '../../../domain/types/Enemy';
 
-export const ENEMY_TEMPLATES: readonly EnemyTemplate[] = [
-    {
+// Convertir en dictionnaire pour accès par ID
+export const ENEMY_TEMPLATES: Record<string, DomainEnemyTemplate> = {
+    'goblin_scout': {
         id: 'goblin_scout',
         name: 'Gobelin Éclaireur',
         level: 2,
-        baseAbilities: { strength: 10, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 13, charisma: 7 },
+        baseAbilities: { 
+            strength: 10, 
+            dexterity: 16, 
+            constitution: 12, 
+            intelligence: 10, 
+            wisdom: 13, 
+            charisma: 7 
+        },
         maxHp: 18,
         armorClass: 13,
         speed: 8,
+        challengeRating: 0.5,
+        xpReward: 100,
+        proficiencyBonus: 2,
+        resistances: undefined,
+        vulnerabilities: undefined,
+        immunities: undefined,
         equipment: {
-            weapons: ['shortbow', 'dagger'], // Référence vers WEAPONS_DATA
+            weapons: ['shortbow', 'dagger'],
             armor: ['leather_armor']
         },
+        specialAbilities: undefined,
+        combatModifiers: {
+            attackBonus: 0,
+            damageBonus: 0
+        },
         aiProfile: {
-            behavior: 'tactical',        // Éclaireur = tactique
-            preferredRange: 'ranged',    // Préfère l'arc
+            behavior: 'tactical',
+            preferredRange: 'ranged',
             aggroRadius: 12
         },
         lootTable: [{ itemId: 'gold_pouch_small', dropChance: 0.5 }]
     },
-    {
+    
+    'goblin': {
         id: 'goblin',
         name: 'Gobelin',
         level: 1,
-        baseAbilities: { strength: 12, dexterity: 14, constitution: 12, intelligence: 8, wisdom: 10, charisma: 6 },
-        maxHp: 15,
-        armorClass: 12,
+        baseAbilities: { 
+            strength: 8, 
+            dexterity: 14, 
+            constitution: 10, 
+            intelligence: 10, 
+            wisdom: 8, 
+            charisma: 8 
+        },
+        maxHp: 7,
+        armorClass: 15,
         speed: 6,
+        challengeRating: 0.25,
+        xpReward: 50,
+        proficiencyBonus: 2,
+        resistances: undefined,
+        vulnerabilities: undefined,
+        immunities: undefined,
         equipment: {
-            weapons: ['scimitar'],       // Référence vers WEAPONS_DATA
+            weapons: ['scimitar','shortbow'],
             armor: ['leather_armor']
         },
+        specialAbilities: undefined,
+        combatModifiers: {
+            attackBonus: 0,
+            damageBonus: 0
+        },
         aiProfile: {
-            behavior: 'aggressive',      // Goblin de base = agressif
-            preferredRange: 'melee',     // Combat rapproché
+            behavior: 'defensive',
+            preferredRange: 'ranged',
             aggroRadius: 8
         },
         lootTable: [{ itemId: 'gold_pouch_small', dropChance: 0.3 }]
     },
-    // Ajout de quelques ennemis supplémentaires pour la diversité
-    {
+    
+    'orc_warrior': {
         id: 'orc_warrior',
         name: 'Guerrier Orc',
         level: 3,
-        baseAbilities: { strength: 16, dexterity: 12, constitution: 16, intelligence: 7, wisdom: 11, charisma: 10 },
+        baseAbilities: { 
+            strength: 16, 
+            dexterity: 12, 
+            constitution: 16, 
+            intelligence: 7, 
+            wisdom: 11, 
+            charisma: 10 
+        },
         maxHp: 28,
         armorClass: 14,
         speed: 6,
+        challengeRating: 1,
+        xpReward: 200,
+        proficiencyBonus: 2,
+        resistances: undefined,
+        vulnerabilities: undefined,
+        immunities: undefined,
         equipment: {
-            weapons: ['battleaxe', 'handaxe'], // Hybride mêlée/jet
+            weapons: ['battleaxe', 'handaxe'],
             armor: ['chain_shirt']
         },
+        specialAbilities: undefined,
         combatModifiers: {
-            attackBonus: 1,          // Guerrier expérimenté
+            attackBonus: 1,
             damageBonus: 2
         },
         aiProfile: {
@@ -101,28 +120,45 @@ export const ENEMY_TEMPLATES: readonly EnemyTemplate[] = [
         },
         lootTable: [{ itemId: 'gold_pouch_medium', dropChance: 0.4 }]
     },
-    {
+    
+    'skeleton_archer': {
         id: 'skeleton_archer',
         name: 'Archer Squelette',
         level: 2,
-        baseAbilities: { strength: 10, dexterity: 14, constitution: 15, intelligence: 6, wisdom: 8, charisma: 5 },
+        baseAbilities: { 
+            strength: 10, 
+            dexterity: 14, 
+            constitution: 15, 
+            intelligence: 6, 
+            wisdom: 8, 
+            charisma: 5 
+        },
         maxHp: 20,
         armorClass: 13,
         speed: 6,
+        challengeRating: 0.5,
+        xpReward: 100,
+        proficiencyBonus: 2,
+        resistances: ['piercing'],
+        vulnerabilities: ['bludgeoning'],
+        immunities: undefined,
         equipment: {
             weapons: ['shortbow', 'shortsword'],
             armor: ['leather_armor']
         },
+        specialAbilities: ['undead_fortitude'],
         combatModifiers: {
-            resistances: ['piercing'], // Résistance aux flèches
-            vulnerabilities: ['bludgeoning'] // Vulnérable aux masses
+            attackBonus: 0,
+            damageBonus: 0
         },
         aiProfile: {
-            behavior: 'defensive',   // Reste à distance
+            behavior: 'defensive',
             preferredRange: 'ranged',
             aggroRadius: 15
         },
-        specialAbilities: ['undead_fortitude'], // Ne tombe pas facilement
         lootTable: [{ itemId: 'bone_fragments', dropChance: 0.8 }]
     }
-];
+};
+
+// Export pour compatibilité si besoin
+export type EnemyTemplate = DomainEnemyTemplate;

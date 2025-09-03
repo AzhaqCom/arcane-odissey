@@ -40,11 +40,11 @@ export const GameUI: React.FC<GameUIProps> = ({
   const player = session.playerCharacter;
 
   React.useEffect(() => {
-    logger.ui('GameUI rendered', {
-      phase: session.currentPhase,
-      sceneId: session.currentSceneId,
-      actionsCount: gameState.availableActions.length
-    });
+    // logger.ui('GameUI rendered', {
+    //   phase: session.currentPhase,
+    //   sceneId: session.currentSceneId,
+    //   actionsCount: gameState.availableActions.length
+    // });
   }, [session.currentPhase, session.currentSceneId]);
 
   const handleActionClick = (action: GameAction) => {

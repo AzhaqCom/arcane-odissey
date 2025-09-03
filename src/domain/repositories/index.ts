@@ -6,6 +6,7 @@
 export type { ISceneRepository } from './ISceneRepository';
 export type { IGameSessionRepository } from './IGameSessionRepository';
 export type { ICharacterRepository } from './ICharacterRepository';
+export type { IEnemyRepository } from './IEnemyRepository';
 // export type { ICombatRepository } from './ICombatRepository'; // Supprimé avec l'ancien système
 // export type { IEffectsRepository } from './IEffectsRepository'; // Supprimé avec l'ancien système
 export type { IWeaponRepository } from './IWeaponRepository';

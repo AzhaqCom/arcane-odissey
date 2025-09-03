@@ -34,11 +34,11 @@ export const SceneRenderer: React.FC<SceneRendererProps> = ({
   onSpellCast
 }) => {
   React.useEffect(() => {
-    logger.ui(`Rendering scene: ${scene.id}`, {
-      type: scene.type,
-      title: scene.title,
-      choicesCount: sceneAnalysis.availableChoices.length
-    });
+    // logger.ui(`Rendering scene: ${scene.id}`, {
+    //   type: scene.type,
+    //   title: scene.title,
+    //   choicesCount: sceneAnalysis.availableChoices.length
+    // });
   }, [scene.id, scene.type, sceneAnalysis.availableChoices.length]);
 
   // Déléguer le rendu selon le type de scène
@@ -161,7 +161,7 @@ export const SceneRenderer: React.FC<SceneRendererProps> = ({
       );
 
     default:
-      logger.ui(`Unknown scene type: ${scene.type}`, { sceneId: scene.id });
+      // logger.ui(`Unknown scene type: ${scene.type}`, { sceneId: scene.id });
       return (
         <div className="scene-error">
           <h2>Erreur</h2>

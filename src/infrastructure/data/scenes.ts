@@ -224,21 +224,14 @@ Au loin, vous apercevez un sentier qui s'enfonce dans les profondeurs de la for�
       // Ennemis à instancier - Système avec count
       enemies: [
         { 
-          templateId: 'goblin_scout',
-          customName: 'Gobelin Éclaireur',
-          level: 2,
-          count: 1, // 2 éclaireurs
-          position: { x: 8, y: 2 },
+          templateId: 'goblin', 
+          customName: 'Gobelin',
+          level: 1,
+          count: 2,
+          position: { x: 9, y: 6 },
           alternativePositions: [
             { x: 10, y: 3 } // Position du 2e éclaireur
           ]
-        },
-        { 
-          templateId: 'goblin', 
-          customName: 'Gobelin Guerrier',
-          level: 1,
-          count: 1,
-          position: { x: 9, y: 6 }
         }
       ],
       

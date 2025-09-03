@@ -4,9 +4,10 @@
  * Respecte ARCHITECTURE_GUIDELINES.md - Règle #5 Fonctions Pures
  */
 
-import type { CombatEntity, CombatAction, CombatState } from '../entities/CombatEngine';
+import type { CombatEntity, CombatAction, CombatState, Position } from '../entities/CombatEngine';
 import type { DiceRollingService } from './DiceRollingService';
 import type { ILogger } from './ILogger';
+import type { WeaponResolutionService } from './WeaponResolutionService';
 
 /**
  * SERVICE AI SIMPLE ET PUR
@@ -16,10 +17,12 @@ import type { ILogger } from './ILogger';
  */
 export class SimpleAIService {
   private diceRollingService: DiceRollingService;
+  private weaponResolutionService: WeaponResolutionService;
   private logger: ILogger;
   
-  constructor(diceRollingService: DiceRollingService, logger: ILogger) {
+  constructor(diceRollingService: DiceRollingService, weaponResolutionService: WeaponResolutionService, logger: ILogger) {
     this.diceRollingService = diceRollingService;
+    this.weaponResolutionService = weaponResolutionService;
     this.logger = logger;
   }
 
@@ -58,7 +61,8 @@ export class SimpleAIService {
   }
 
   /**
-   * Comportement AGRESSIF - Attaque toujours le plus proche
+   * ✅ FONCTIONNALITÉ 2 - Comportement AGRESSIF avec mouvement tactique
+   * L'IA peut combiner mouvement + attaque dans le même tour
    */
   private calculateAggressiveAction(entity: CombatEntity, combatState: CombatState): CombatAction {
     const enemies = this.getEnemiesOf(entity, combatState.entities);
@@ -67,20 +71,58 @@ export class SimpleAIService {
       return { type: 'end_turn', entityId: entity.id };
     }
 
-    // Trouver l'ennemi le plus proche
     const closestEnemy = this.findClosestEnemy(entity, enemies);
+    const currentDistance = this.calculateDistance(entity.position, closestEnemy.position);
     
-    this.logger.debug('SIMPLE_AI', 'Aggressive behavior - attacking closest', {
-      entityName: entity.name,
-      targetName: closestEnemy.name,
-      distance: this.calculateDistance(entity.position, closestEnemy.position)
-    });
+    // ✅ LOGIQUE TACTIQUE D&D : Évaluer portée d'attaque selon l'arme
+    const attackRange = this.getAttackRange(entity);
+    const canAttackFromCurrentPosition = currentDistance <= attackRange;
+    
+    // Si trop loin pour attaquer avec l'arme actuelle, se rapprocher
+    if (!canAttackFromCurrentPosition && entity.actionsRemaining.movement > 0) {
+      const optimalPosition = this.findOptimalAttackPosition(entity, closestEnemy, combatState, attackRange);
+      
+      if (optimalPosition) {
+        this.logger.debug('SIMPLE_AI', 'Moving for optimal attack range', {
+          entityName: entity.name,
+          targetName: closestEnemy.name,
+          currentDistance,
+          attackRange,
+          weaponType: this.getWeaponType(entity),
+          movingTo: optimalPosition
+        });
+        
+        return {
+          type: 'move_and_attack',
+          entityId: entity.id,
+          position: optimalPosition,
+          targetId: closestEnemy.id
+        };
+      }
+    }
+    
+    // Si déjà à portée selon l'arme, attaquer directement
+    if (canAttackFromCurrentPosition && entity.actionsRemaining.action) {
+      return {
+        type: 'attack',
+        entityId: entity.id,
+        targetId: closestEnemy.id
+      };
+    }
+    
+    // Sinon juste se déplacer
+    if (entity.actionsRemaining.movement > 0) {
+      const movePosition = this.findOptimalMovePosition(entity, closestEnemy, combatState);
+      if (movePosition) {
+        return {
+          type: 'move',
+          entityId: entity.id,
+          position: movePosition
+        };
+      }
+    }
 
-    return {
-      type: 'attack',
-      entityId: entity.id,
-      targetId: closestEnemy.id
-    };
+    return { type: 'end_turn', entityId: entity.id };
   }
 
   /**
@@ -245,6 +287,113 @@ export class SimpleAIService {
    */
   private calculateDistance(pos1: { x: number; y: number }, pos2: { x: number; y: number }): number {
     return Math.abs(pos1.x - pos2.x) + Math.abs(pos1.y - pos2.y); // Distance Manhattan
+  }
+
+  /**
+   * ✅ RÈGLE #3 : Logique métier dans Domain
+   * Déterminer portée d'attaque selon l'arme équipée
+   */
+  private getAttackRange(entity: CombatEntity): number {
+    const weapon = this.weaponResolutionService.resolveWeaponForEntity(entity);
+    return weapon ? weapon.getAttackRange() : 1; // Mains nues = 1 case
+  }
+
+  /**
+   * ✅ RÈGLE #3 : Logique métier dans Domain
+   * Identifier type d'arme équipée pour logs
+   */
+  private getWeaponType(entity: CombatEntity): string {
+    const weapon = this.weaponResolutionService.resolveWeaponForEntity(entity);
+    if (!weapon) return 'unarmed';
+    return weapon.category;
+  }
+
+  /**
+   * ✅ FONCTIONNALITÉ 2 - Trouver position optimale pour attaque
+   * Respecte la portée d'arme : adjacent pour corps à corps, distance pour ranged
+   */
+  private findOptimalAttackPosition(entity: CombatEntity, target: CombatEntity, combatState: CombatState, attackRange: number): Position | null {
+    const movementRange = Math.floor(entity.actionsRemaining.movement / 5); // 5 feet par case
+    const { x: startX, y: startY } = entity.position;
+    const { x: targetX, y: targetY } = target.position;
+
+    let bestPosition: Position | null = null;
+    let bestScore = -1;
+
+    // Grille 12x8 standard
+    for (let y = 0; y < 8; y++) {
+      for (let x = 0; x < 12; x++) {
+        // Position atteignable avec le mouvement ?
+        const distanceFromStart = Math.abs(x - startX) + Math.abs(y - startY);
+        if (distanceFromStart > movementRange || distanceFromStart === 0) continue;
+
+        // Position libre ?
+        const isOccupied = combatState.entities.some(e => 
+          !e.isDead && e.position.x === x && e.position.y === y
+        );
+        if (isOccupied) continue;
+
+        // Distance à la cible depuis cette position
+        const distanceToTarget = Math.abs(x - targetX) + Math.abs(y - targetY);
+        
+        // Position dans la portée d'attaque ?
+        if (distanceToTarget <= attackRange) {
+          let score = 100 - distanceFromStart; // Préférer positions plus proches de nous
+          
+          // Bonus pour distance optimale selon type d'arme
+          if (attackRange === 1) {
+            // Corps à corps : distance 1 parfaite
+            if (distanceToTarget === 1) score += 50;
+          } else {
+            // Armes à distance : éviter d'être trop proche (désavantage)
+            if (distanceToTarget > 1) score += 20;
+            if (distanceToTarget >= 3 && distanceToTarget <= attackRange) score += 30;
+          }
+          
+          if (score > bestScore) {
+            bestScore = score;
+            bestPosition = { x, y };
+          }
+        }
+      }
+    }
+
+    return bestPosition;
+  }
+
+  /**
+   * ✅ FONCTIONNALITÉ 2 - Position pour mouvement simple (se rapprocher)
+   */
+  private findOptimalMovePosition(entity: CombatEntity, target: CombatEntity, combatState: CombatState): Position | null {
+    const movementRange = Math.floor(entity.actionsRemaining.movement / 5);
+    const { x: startX, y: startY } = entity.position;
+    const { x: targetX, y: targetY } = target.position;
+
+    let bestPosition: Position | null = null;
+    let bestDistance = Infinity;
+
+    for (let y = 0; y < 8; y++) {
+      for (let x = 0; x < 12; x++) {
+        // Atteignable ?
+        const distanceFromStart = Math.abs(x - startX) + Math.abs(y - startY);
+        if (distanceFromStart > movementRange || distanceFromStart === 0) continue;
+
+        // Libre ?
+        const isOccupied = combatState.entities.some(e => 
+          !e.isDead && e.position.x === x && e.position.y === y
+        );
+        if (isOccupied) continue;
+
+        // Plus proche de la cible ?
+        const distanceToTarget = Math.abs(x - targetX) + Math.abs(y - targetY);
+        if (distanceToTarget < bestDistance) {
+          bestDistance = distanceToTarget;
+          bestPosition = { x, y };
+        }
+      }
+    }
+
+    return bestPosition;
   }
 
   /**

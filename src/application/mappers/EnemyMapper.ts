@@ -3,7 +3,7 @@
  * Conversion entre les données ennemis infrastructure et domaine
  */
 
-import type { EnemySpec, AbilityScores, Position } from '../../domain/types';
+import type { EnemySpec, Stats, Position } from '../../domain/types';
 import type { EnemyDataSource } from '../../infrastructure/data/types/CharacterData';
 import type { EnemyTemplate } from '../../infrastructure/data/characters/enemies';
 
@@ -20,7 +20,7 @@ export class EnemyMapper {
     template: EnemyTemplate
   ): {
     enemySpec: EnemySpec;
-    baseStats: AbilityScores;
+    baseStats: Stats;
     maxHp: number;
     armorClass: number;
     speed: number;
@@ -39,7 +39,7 @@ export class EnemyMapper {
 
     return {
       enemySpec,
-      baseStats: this.mapAbilityScores(template.baseAbilities),
+      baseStats: this.mapStats(template.baseAbilities),
       maxHp: template.maxHp,
       armorClass: template.armorClass,
       speed: template.speed,
@@ -70,7 +70,7 @@ export class EnemyMapper {
 
   // === MÉTHODES PRIVÉES ===
 
-  private static mapAbilityScores(infraAbilities: any): AbilityScores {
+  private static mapStats(infraAbilities: any): Stats {
     return {
       strength: infraAbilities.strength || 10,
       dexterity: infraAbilities.dexterity || 10,

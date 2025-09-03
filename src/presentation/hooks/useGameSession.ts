@@ -48,7 +48,7 @@ export const useGameSession = (): UseGameSessionReturn => {
 
   // ✅ OPTIMISATION: Fonction d'initialisation memoized
   const initializeSession = React.useCallback(async () => {
-    logger.ui('useGameSession: Starting session initialization');
+    // logger.ui('useGameSession: Starting session initialization');
     
     // État de chargement
     setSessionState(gameSessionUseCase.createLoadingState());
@@ -58,7 +58,7 @@ export const useGameSession = (): UseGameSessionReturn => {
     
     if (result.success && result.sessionState) {
       setSessionState(result.sessionState);
-      logger.ui('useGameSession: Session initialized successfully');
+      // logger.ui('useGameSession: Session initialized successfully');
     } else {
       setSessionState(gameSessionUseCase.createErrorState(
         result.error || 'Erreur d\'initialisation inconnue'
@@ -90,7 +90,7 @@ export const useGameSession = (): UseGameSessionReturn => {
     choiceId: string, 
     targetSceneId: string
   ): Promise<boolean> => {
-    logger.ui('useGameSession: Processing scene transition', { choiceId, targetSceneId });
+    // logger.ui('useGameSession: Processing scene transition', { choiceId, targetSceneId });
     
     const result = await gameSessionUseCase.handleSceneTransition(choiceId, targetSceneId);
     
@@ -107,9 +107,9 @@ export const useGameSession = (): UseGameSessionReturn => {
           };
       
       setSessionState(updatedState);
-      logger.ui('useGameSession: Scene transition completed');
+      // logger.ui('useGameSession: Scene transition completed');
     } else {
-      logger.ui('useGameSession: Scene transition failed');
+      // logger.ui('useGameSession: Scene transition failed');
     }
     
     return result.success;
@@ -121,11 +121,11 @@ export const useGameSession = (): UseGameSessionReturn => {
    */
   const handleRest = React.useCallback(async (restType: 'short' | 'long'): Promise<boolean> => {
     if (!sessionState.gameState) {
-      logger.ui('useGameSession: Cannot rest - no game state');
+      // logger.ui('useGameSession: Cannot rest - no game state');
       return false;
     }
 
-    logger.ui('useGameSession: Processing rest request', { restType });
+    // logger.ui('useGameSession: Processing rest request', { restType });
 
     const result = await gameSessionUseCase.handleRest(restType, sessionState.gameState.session);
     
@@ -148,9 +148,9 @@ export const useGameSession = (): UseGameSessionReturn => {
         }));
       }
 
-      logger.ui('useGameSession: Rest completed successfully');
+      // logger.ui('useGameSession: Rest completed successfully');
     } else {
-      logger.ui('useGameSession: Rest failed');
+      // logger.ui('useGameSession: Rest failed');
     }
     
     return result.success;
@@ -161,7 +161,7 @@ export const useGameSession = (): UseGameSessionReturn => {
    * Délègue au Use Case et gère le message de confirmation
    */
   const handleSave = React.useCallback(async (): Promise<boolean> => {
-    logger.ui('useGameSession: Processing save request');
+    // logger.ui('useGameSession: Processing save request');
 
     const result = await gameSessionUseCase.saveGame();
     
@@ -172,9 +172,9 @@ export const useGameSession = (): UseGameSessionReturn => {
         narrativeMessages: [...prev.narrativeMessages, result.narrativeMessage!]
       }));
       
-      logger.ui('useGameSession: Game saved successfully');
+      // logger.ui('useGameSession: Game saved successfully');
     } else {
-      logger.ui('useGameSession: Save failed');
+      // logger.ui('useGameSession: Save failed');
     }
     
     return result.success;
@@ -190,10 +190,10 @@ export const useGameSession = (): UseGameSessionReturn => {
       narrativeMessages: [...prev.narrativeMessages, message]
     }));
     
-    logger.ui('useGameSession: Narrative message added', { 
-      type: message.type, 
-      content: message.content.substring(0, 50) + '...' 
-    });
+    // logger.ui('useGameSession: Narrative message added', { 
+    //   type: message.type, 
+    //   content: message.content.substring(0, 50) + '...' 
+    // });
   }, []);
 
   /**
@@ -206,7 +206,7 @@ export const useGameSession = (): UseGameSessionReturn => {
       narrativeMessages: []
     }));
     
-    logger.ui('useGameSession: Narrative messages cleared');
+    // logger.ui('useGameSession: Narrative messages cleared');
   }, []);
 
   // Interface publique du hook

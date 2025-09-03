@@ -42,18 +42,18 @@ export class DamageCalculationService {
   private static getRelevantAbilityModifier(weapon: Weapon, attacker: Character): number {
     // Armes à distance utilisent Dextérité
     if (weapon.category === 'ranged') {
-      return AbilityCalculationService.calculateModifier(attacker.abilities.dexterity);
+      return AbilityCalculationService.calculateModifier(attacker.stats.dexterity);
     }
     
     // Armes de finesse peuvent utiliser Dex ou Str (on prend le meilleur)
     if (weapon.properties.includes('finesse')) {
-      const strMod = AbilityCalculationService.calculateModifier(attacker.abilities.strength);
-      const dexMod = AbilityCalculationService.calculateModifier(attacker.abilities.dexterity);
+      const strMod = AbilityCalculationService.calculateModifier(attacker.stats.strength);
+      const dexMod = AbilityCalculationService.calculateModifier(attacker.stats.dexterity);
       return Math.max(strMod, dexMod);
     }
     
     // Armes de mêlée utilisent Force par défaut
-    return AbilityCalculationService.calculateModifier(attacker.abilities.strength);
+    return AbilityCalculationService.calculateModifier(attacker.stats.strength);
   }
 
   /**

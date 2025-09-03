@@ -6,7 +6,7 @@
 
 // === TYPES DE BASE PARTAGÉS ===
 
-export type AbilityScores = {
+export type Stats = {
   readonly strength: number;
   readonly dexterity: number;
   readonly constitution: number;
@@ -36,7 +36,7 @@ export interface PlayerDataSource extends BaseDataSource {
   readonly raceId: string;
   readonly level: number;
   readonly xp: number;
-  readonly baseAbilities: AbilityScores;
+  readonly baseAbilities: Stats;
   readonly knownSpellIds: readonly string[];
   readonly inventory: InventoryDataSource;
 
@@ -55,7 +55,7 @@ export interface CompanionDataSource extends BaseDataSource {
   // Un compagnon peut avoir une structure similaire à un joueur ou plus simple
   // Pour l'instant, on le garde simple.
   readonly level: number;
-  readonly baseAbilities: AbilityScores;
+  readonly baseAbilities: Stats;
   readonly savedState: {
     readonly currentHp: number;
     readonly position?: { readonly x: number; readonly y: number };

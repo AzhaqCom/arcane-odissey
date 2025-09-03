@@ -7,6 +7,7 @@
 
 import React, { useMemo } from 'react';
 import type { CombatEntityView } from '../types/CombatTypes';
+import type { PlayerActionContext } from '../hooks/useCombatGame';
 
 // Types locaux pour la grille
 type Position = { x: number; y: number };
@@ -22,9 +23,13 @@ interface CombatGridNewProps {
   // Props pures - View Models uniquement
   entities: CombatEntityView[];
   currentEntity: CombatEntityView | null;
-  isMovementMode: boolean;
+  isMovementMode: boolean; // ❌ LEGACY - À remplacer par playerActionContext
   onCellClick: (position: Position) => void;
   gridDimensions?: { width: number; height: number };
+  
+  // ✅ FONCTIONNALITÉ 1.2 - Support micro-états UI
+  playerActionContext: PlayerActionContext;
+  onCellInteraction: (position: Position, interactionType: 'move' | 'target') => void;
 }
 
 /**
@@ -34,13 +39,17 @@ interface CombatGridNewProps {
 export const CombatGridNew: React.FC<CombatGridNewProps> = ({
   entities,
   currentEntity,
-  isMovementMode,
-  onCellClick,
-  gridDimensions = { width: 12, height: 8 }
+  isMovementMode, // ❌ LEGACY
+  onCellClick, // ❌ LEGACY
+  gridDimensions = { width: 12, height: 8 },
+  
+  // ✅ FONCTIONNALITÉ 1.2 - Nouvelles props
+  playerActionContext,
+  onCellInteraction
 }) => {
   // Créer une map des entités par position
   const entitiesByPosition = useMemo(() => {
-    const map = new Map<string, CombatEntity>();
+    const map = new Map<string, CombatEntityView>();
     entities.forEach(entity => {
       if (!entity.isDead && entity.position) {
         const key = `${entity.position.x},${entity.position.y}`;
@@ -50,18 +59,26 @@ export const CombatGridNew: React.FC<CombatGridNewProps> = ({
     return map;
   }, [entities]);
 
-  // Calculer les cellules atteignables pour le mouvement
+  // ✅ FONCTIONNALITÉ 1.2 - Cellules atteignables selon le contexte action
   const reachableCells = useMemo(() => {
     const cells = new Set<string>();
-    if (isMovementMode && currentEntity?.position && currentEntity.actionsRemaining?.movement) {
+    
+    // Mode mouvement : utiliser les cellules du contexte
+    if (playerActionContext.state === 'AWAITING_MOVEMENT_CONFIRMATION' && playerActionContext.reachableCells) {
+      playerActionContext.reachableCells.forEach(pos => {
+        cells.add(`${pos.x},${pos.y}`);
+      });
+    }
+    
+    // Legacy fallback pour compatibilité
+    else if (isMovementMode && currentEntity?.position && currentEntity.actionsRemaining?.movement) {
       const movement = currentEntity.actionsRemaining.movement;
       const { x: cx, y: cy } = currentEntity.position;
       
-      // Calculer les cellules dans le rayon de mouvement
       for (let y = 0; y < gridDimensions.height; y++) {
         for (let x = 0; x < gridDimensions.width; x++) {
           const distance = Math.abs(x - cx) + Math.abs(y - cy);
-          if (distance <= movement / 5 && distance > 0) { // 5 feet par cellule
+          if (distance <= movement / 5 && distance > 0) {
             const key = `${x},${y}`;
             if (!entitiesByPosition.has(key)) {
               cells.add(key);
@@ -70,8 +87,27 @@ export const CombatGridNew: React.FC<CombatGridNewProps> = ({
         }
       }
     }
+    
     return cells;
-  }, [isMovementMode, currentEntity, entitiesByPosition, gridDimensions]);
+  }, [playerActionContext, isMovementMode, currentEntity, entitiesByPosition, gridDimensions]);
+
+  // ✅ FONCTIONNALITÉ 1.2 - Cellules ciblables
+  const targetableCells = useMemo(() => {
+    const cells = new Set<string>();
+    
+    if ((playerActionContext.state === 'AWAITING_ATTACK_TARGET' || playerActionContext.state === 'AWAITING_SPELL_TARGET') 
+        && playerActionContext.validTargets) {
+      
+      // Marquer les positions des cibles valides
+      entities.forEach(entity => {
+        if (playerActionContext.validTargets?.includes(entity.id) && entity.position) {
+          cells.add(`${entity.position.x},${entity.position.y}`);
+        }
+      });
+    }
+    
+    return cells;
+  }, [playerActionContext, entities]);
 
   // Calculer l'affichage des points de vie
   const getHealthDisplay = (entity: CombatEntityView): HealthDisplay => {
@@ -95,12 +131,14 @@ export const CombatGridNew: React.FC<CombatGridNewProps> = ({
     };
   };
 
-  // Obtenir le contenu d'une cellule
+  // ✅ FONCTIONNALITÉ 1.2 - Contenu cellule avec contexte action
   const getCellContent = (x: number, y: number): React.ReactNode => {
     const key = `${x},${y}`;
     const entity = entitiesByPosition.get(key);
     const isReachable = reachableCells.has(key);
+    const isTargetable = targetableCells.has(key);
 
+    // Entité présente
     if (entity) {
       const healthDisplay = getHealthDisplay(entity);
       
@@ -117,22 +155,30 @@ export const CombatGridNew: React.FC<CombatGridNewProps> = ({
             />
           </div>
           <div className="entity-hp-text">{healthDisplay.displayText}</div>
+          {/* Indicateur de ciblage */}
+          {isTargetable && <div className="target-indicator">🎯</div>}
         </div>
       );
     }
 
+    // Modes d'interaction
+    if (playerActionContext.state === 'AWAITING_MOVEMENT_CONFIRMATION' && isReachable) {
+      return '🔷'; // Mouvement possible
+    }
+    
     if (isMovementMode && isReachable) {
-      return '🎯'; // Icône de mouvement possible
+      return '🎯'; // Legacy fallback
     }
 
     return '';
   };
 
-  // Obtenir le style d'une cellule
+  // ✅ FONCTIONNALITÉ 1.2 - Style cellule selon contexte action
   const getCellStyle = (x: number, y: number): React.CSSProperties => {
     const key = `${x},${y}`;
     const entity = entitiesByPosition.get(key);
     const isReachable = reachableCells.has(key);
+    const isTargetable = targetableCells.has(key);
 
     let backgroundColor = 'transparent';
     let border = '1px solid #dee2e6';
@@ -149,10 +195,24 @@ export const CombatGridNew: React.FC<CombatGridNewProps> = ({
       if (entity.isDead) {
         backgroundColor = '#d0d0d0';
       }
+
+      // Entité ciblable
+      if (isTargetable) {
+        backgroundColor = '#ff6b6b';
+        border = '2px solid #ff3333';
+        cursor = 'crosshair';
+      }
     }
 
-    // Mode mouvement - surbrillance des cellules atteignables
-    if (isMovementMode && isReachable && !entity) {
+    // Mode mouvement - cellules atteignables
+    if (playerActionContext.state === 'AWAITING_MOVEMENT_CONFIRMATION' && isReachable && !entity) {
+      backgroundColor = '#4dabf7';
+      border = '2px solid #339af0';
+      cursor = 'pointer';
+    }
+    
+    // Legacy fallback
+    else if (isMovementMode && isReachable && !entity) {
       backgroundColor = '#352941';
       border = '1px solid #8962b1ff';
       cursor = 'pointer';
@@ -175,11 +235,30 @@ export const CombatGridNew: React.FC<CombatGridNewProps> = ({
     };
   };
 
-  // Gérer le clic sur une cellule
+  // ✅ FONCTIONNALITÉ 1.2 - Gestion clic selon contexte action
   const handleCellClick = (x: number, y: number) => {
     const key = `${x},${y}`;
+    const position = { x, y };
+    
+    // Mode mouvement
+    if (playerActionContext.state === 'AWAITING_MOVEMENT_CONFIRMATION' && reachableCells.has(key) && !entitiesByPosition.has(key)) {
+      onCellInteraction(position, 'move');
+      return;
+    }
+    
+    // Mode ciblage
+    if ((playerActionContext.state === 'AWAITING_ATTACK_TARGET' || playerActionContext.state === 'AWAITING_SPELL_TARGET') && targetableCells.has(key)) {
+      const targetEntity = entitiesByPosition.get(key);
+      if (targetEntity) {
+        // Utiliser l'ID de l'entité comme position pour le callback
+        onCellInteraction({ x: targetEntity.id, y: 0 } as any, 'target');
+      }
+      return;
+    }
+    
+    // Legacy fallback
     if (isMovementMode && reachableCells.has(key) && !entitiesByPosition.has(key)) {
-      onCellClick({ x, y });
+      onCellClick(position);
     }
   };
 

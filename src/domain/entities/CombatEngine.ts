@@ -7,6 +7,7 @@
 import type { DiceRollingService } from '../services/DiceRollingService';
 import type { DamageCalculationService } from '../services/DamageCalculationService';
 import type { ILogger } from '../services/ILogger';
+import type { WeaponResolutionService } from '../services/WeaponResolutionService';
 
 // Types de base
 export interface CombatEntity {
@@ -19,7 +20,7 @@ export interface CombatEntity {
   armorClass: number;
   speed: number;
   initiative: number;
-  abilities: {
+  stats: {
     strength: number;
     dexterity: number;
     constitution: number;
@@ -35,22 +36,42 @@ export interface CombatEntity {
     bonusAction: boolean;
     reaction: boolean;
     movement: number;
+    movementUsed: boolean;
   };
   aiBehavior?: 'aggressive' | 'tactical' | 'defensive';
+  equipment?: {
+    weapons?: string[];
+    armor?: string[];
+  };
 }
 
 export type CombatPhase = 'setup' | 'active' | 'victory' | 'defeat';
-export type ActionType = 'attack' | 'move' | 'end_turn' | 'cast_spell';
+export type ActionType = 'attack' | 'move' | 'end_turn' | 'cast_spell' | 'move_and_attack';
+export interface Position {
+  x: number;
+  y: number;
+}
+
+export interface NarrativeMessage {
+  id: string;
+  type: 'movement' | 'attack_success' | 'attack_miss' | 'critical_hit' | 'turn_start' | 'turn_end' | 'combat_start' | 'combat_end';
+  timestamp: Date;
+  actors: string[];
+  action: string;
+  result: string;
+  details?: Record<string, any>;
+}
 
 export interface CombatState {
   entities: CombatEntity[];
   currentTurnIndex: number;
   round: number;
   phase: CombatPhase;
+  narratives: NarrativeMessage[];
 }
 
 export interface CombatAction {
-  type: 'attack' | 'move' | 'spell' | 'defend' | 'end_turn';
+  type: 'attack' | 'move' | 'spell' | 'defend' | 'end_turn' | 'move_and_attack';
   entityId: string;
   targetId?: string;
   weaponId?: string;
@@ -69,7 +90,13 @@ export interface CombatResult {
 export interface CombatDependencies {
   diceRollingService: DiceRollingService;
   damageCalculationService: DamageCalculationService;
+  weaponResolutionService: WeaponResolutionService;
   logger: ILogger;
+}
+
+// Utilitaire pour générer des IDs uniques
+function generateNarrativeId(): string {
+  return `narrative_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
 /**
@@ -84,6 +111,7 @@ export class CombatEngine {
   private currentTurnIndex: number;
   private round: number;
   private phase: CombatPhase;
+  private narratives: NarrativeMessage[];
   private dependencies: CombatDependencies;
 
   private constructor(
@@ -91,12 +119,14 @@ export class CombatEngine {
     currentTurnIndex: number,
     round: number,
     phase: CombatPhase,
+    narratives: NarrativeMessage[],
     dependencies: CombatDependencies
   ) {
     this.entities = entities;
     this.currentTurnIndex = currentTurnIndex;
     this.round = round;
     this.phase = phase;
+    this.narratives = narratives;
     this.dependencies = dependencies;
   }
 
@@ -104,10 +134,18 @@ export class CombatEngine {
    * Factory method - Point d'entrée unique
    */
   static create(dependencies: CombatDependencies): CombatEngine {
-    return new CombatEngine([], 0, 1, 'setup', dependencies);
+    return new CombatEngine([], 0, 1, 'setup', [], dependencies);
   }
 
   // === MÉTHODES IMMUTABLES (PATTERN WITH...) ===
+
+  /**
+   * Ajouter des messages narratifs (retourne nouvelle instance)
+   */
+  private withAddedNarratives(...newNarratives: NarrativeMessage[]): CombatEngine {
+    const updatedNarratives = [...this.narratives, ...newNarratives];
+    return new CombatEngine(this.entities, this.currentTurnIndex, this.round, this.phase, updatedNarratives, this.dependencies);
+  }
 
   /**
    * Ajouter une entité (retourne nouvelle instance)
@@ -126,6 +164,7 @@ export class CombatEngine {
       this.currentTurnIndex,
       this.round,
       this.phase,
+      this.narratives,
       this.dependencies
     );
   }
@@ -138,7 +177,7 @@ export class CombatEngine {
     const entitiesWithInitiative = this.entities.map(entity => ({
       ...entity,
       initiative: this.dependencies.diceRollingService.roll('1d20') + 
-                  Math.floor((entity.abilities.dexterity - 10) / 2)
+                  Math.floor((entity.stats.dexterity - 10) / 2)
     }));
 
     // Trier par initiative décroissante, puis par dextérité
@@ -147,14 +186,14 @@ export class CombatEngine {
         if (b.initiative !== a.initiative) {
           return b.initiative - a.initiative;
         }
-        return b.abilities.dexterity - a.abilities.dexterity;
+        return b.stats.dexterity - a.stats.dexterity;
       });
 
     this.dependencies.logger.info('COMBAT_ENGINE', 'Initiative rolled', {
       initiativeOrder: sortedEntities.map(e => ({
         name: e.name,
         initiative: e.initiative,
-        dexterity: e.abilities.dexterity
+        dexterity: e.stats.dexterity
       }))
     });
 
@@ -163,6 +202,7 @@ export class CombatEngine {
       0, // Premier dans l'ordre d'initiative
       1, // Premier round
       'active',
+      this.narratives,
       this.dependencies
     );
   }
@@ -182,12 +222,13 @@ export class CombatEngine {
     }
 
     // Appliquer l'action selon son type
-    const updatedEntities = this.applyActionToEntities(this.entities, action);
+    const { entities: updatedEntities, narratives } = this.applyActionToEntitiesWithNarratives(this.entities, action, currentEntity);
     
     this.dependencies.logger.debug('COMBAT_ENGINE', 'Action applied', {
       actionType: action.type,
       entityId: action.entityId,
-      targetId: action.targetId
+      targetId: action.targetId,
+      narrativesGenerated: narratives.length
     });
 
     return new CombatEngine(
@@ -195,6 +236,7 @@ export class CombatEngine {
       this.currentTurnIndex,
       this.round,
       this.phase,
+      [...this.narratives, ...narratives],
       this.dependencies
     );
   }
@@ -205,6 +247,7 @@ export class CombatEngine {
   withAdvancedTurn(): CombatEngine {
     let nextIndex = this.currentTurnIndex + 1;
     let nextRound = this.round;
+    let newNarratives: NarrativeMessage[] = [];
 
     // Si on dépasse la fin de l'ordre, nouveau round
     if (nextIndex >= this.entities.length) {
@@ -218,13 +261,20 @@ export class CombatEngine {
           action: true,
           bonusAction: true,
           reaction: true,
-          movement: entity.speed || 30
+          movement: (entity.speed || 6) * 5 // Convertir cases → pieds (1 case = 5 pieds D&D)
         }
       }));
 
+      // ✅ FONCTIONNALITÉ 3 - Narratif début de tour de la nouvelle entité
+      const nextEntity = resetEntities[nextIndex];
+      if (nextEntity) {
+        newNarratives.push(this.generateTurnStartNarrative(nextEntity));
+      }
+
       this.dependencies.logger.info('COMBAT_ENGINE', 'New round started', {
         round: nextRound,
-        entitiesReset: resetEntities.length
+        entitiesReset: resetEntities.length,
+        nextEntityName: nextEntity?.name
       });
 
       return new CombatEngine(
@@ -232,8 +282,15 @@ export class CombatEngine {
         nextIndex,
         nextRound,
         this.checkCombatEndCondition(resetEntities),
+        [...this.narratives, ...newNarratives],
         this.dependencies
       );
+    }
+
+    // ✅ FONCTIONNALITÉ 3 - Narratif début de tour de la nouvelle entité
+    const nextEntity = this.entities[nextIndex];
+    if (nextEntity) {
+      newNarratives.push(this.generateTurnStartNarrative(nextEntity));
     }
 
     return new CombatEngine(
@@ -241,6 +298,7 @@ export class CombatEngine {
       nextIndex,
       nextRound,
       this.checkCombatEndCondition(this.entities),
+      [...this.narratives, ...newNarratives],
       this.dependencies
     );
   }
@@ -258,6 +316,7 @@ export class CombatEngine {
       this.currentTurnIndex,
       this.round,
       this.phase,
+      this.narratives,
       this.dependencies
     );
   }
@@ -279,7 +338,8 @@ export class CombatEngine {
       entities: [...this.entities],
       currentTurnIndex: this.currentTurnIndex,
       round: this.round,
-      phase: this.phase
+      phase: this.phase,
+      narratives: [...this.narratives]
     };
   }
 
@@ -310,6 +370,60 @@ export class CombatEngine {
     return this.phase === 'victory' || this.phase === 'defeat';
   }
 
+  /**
+   * ✅ FONCTIONNALITÉ 1.3 - Calculer cellules atteignables pour mouvement
+   * Logique tactique pure dans le Domain - Respecte Règle #1
+   */
+  calculateReachableCells(characterId: string): { x: number; y: number }[] {
+    const character = this.getEntity(characterId);
+    if (!character) {
+      return [];
+    }
+
+    const movementRange = Math.floor(character.actionsRemaining.movement / 5); // 5 feet par cellule
+    if (movementRange <= 0) {
+      return [];
+    }
+
+    const reachableCells: { x: number; y: number }[] = [];
+    const { x: startX, y: startY } = character.position;
+    
+    // Grille tactique standard D&D (12x8 par défaut)
+    const gridWidth = 12;
+    const gridHeight = 8;
+
+    // Calculer toutes les positions dans le rayon de mouvement (distance Manhattan)
+    for (let y = 0; y < gridHeight; y++) {
+      for (let x = 0; x < gridWidth; x++) {
+        const distance = Math.abs(x - startX) + Math.abs(y - startY);
+        
+        // Dans le rayon ET différent de la position actuelle
+        if (distance <= movementRange && distance > 0) {
+          // Vérifier qu'aucune entité n'occupe cette position
+          const isOccupied = this.entities.some(entity => 
+            !entity.isDead && 
+            entity.position.x === x && 
+            entity.position.y === y
+          );
+          
+          if (!isOccupied) {
+            reachableCells.push({ x, y });
+          }
+        }
+      }
+    }
+
+    this.dependencies.logger.debug('COMBAT_ENGINE', 'Reachable cells calculated', {
+      characterId,
+      characterName: character.name,
+      movementRange,
+      startPosition: { x: startX, y: startY },
+      reachableCellsCount: reachableCells.length
+    });
+
+    return reachableCells;
+  }
+
   // === MÉTHODES PRIVÉES PURES ===
 
   /**
@@ -321,9 +435,13 @@ export class CombatEngine {
   ): CombatEntity[] {
     switch (action.type) {
       case 'attack':
-        return this.applyAttackAction(entities, action);
+        // Utiliser la version unifiée (sans narratifs pour la compatibilité)
+        const result = this.applyAttackActionUnified(entities, action, entities.find(e => e.id === action.entityId)!);
+        return result.entities;
       case 'move':
         return this.applyMoveAction(entities, action);
+      case 'move_and_attack':
+        return this.applyMoveAndAttackAction(entities, action);
       case 'end_turn':
         return this.applyEndTurnAction(entities, action);
       default:
@@ -332,7 +450,137 @@ export class CombatEngine {
   }
 
   /**
-   * Appliquer une attaque (fonction pure)
+   * Appliquer une action ET générer les narratifs avec les vrais résultats
+   */
+  private applyActionToEntitiesWithNarratives(
+    entities: CombatEntity[], 
+    action: CombatAction,
+    currentEntity: CombatEntity
+  ): { entities: CombatEntity[], narratives: NarrativeMessage[] } {
+    const narratives: NarrativeMessage[] = [];
+    let updatedEntities: CombatEntity[];
+
+    switch (action.type) {
+      case 'move':
+        updatedEntities = this.applyMoveAction(entities, action);
+        if (action.position) {
+          narratives.push(this.generateMoveNarrative(currentEntity, currentEntity.position, action.position));
+        }
+        break;
+        
+      case 'attack':
+        // Utiliser la méthode unifiée avec système d'armes
+        const attackResult = this.applyAttackActionUnified(entities, action, currentEntity);
+        updatedEntities = attackResult.entities;
+        narratives.push(...attackResult.narratives);
+        break;
+        
+      case 'move_and_attack':
+        // Pour move_and_attack, on utilise une version qui retourne aussi les narratifs
+        const result = this.applyMoveAndAttackActionWithNarratives(entities, action, currentEntity);
+        updatedEntities = result.entities;
+        narratives.push(...result.narratives);
+        break;
+        
+      case 'end_turn':
+        updatedEntities = this.applyEndTurnAction(entities, action);
+        break;
+        
+      default:
+        updatedEntities = entities;
+    }
+
+    return { entities: updatedEntities, narratives };
+  }
+
+  /**
+   * Résolution unifiée d'une attaque avec armes
+   * Règle #3 : Logique métier dans le Domaine
+   * Règle #4 : Méthode pure, retourne nouvelle instance
+   */
+  private resolveAttack(
+    attacker: CombatEntity,
+    target: CombatEntity
+  ): { hit: boolean; damage: number; weapon: string; attackRoll: number } {
+    // Calculer la distance pour sélection tactique d'arme
+    const distance = Math.abs(attacker.position.x - target.position.x) + 
+                    Math.abs(attacker.position.y - target.position.y);
+    
+    const weapon = this.dependencies.weaponResolutionService.resolveBestWeaponForDistance(attacker, distance);
+
+    // Attaque à mains nues si pas d'arme
+    if (!weapon) {
+      const attackRoll = this.dependencies.diceRollingService.roll('1d20') +
+                        Math.floor((attacker.stats.strength - 10) / 2);
+
+      if (attackRoll >= target.armorClass) {
+        const damage = Math.max(1, 1 + Math.floor((attacker.stats.strength - 10) / 2));
+        return { hit: true, damage, weapon: 'Mains nues', attackRoll };
+      }
+      return { hit: false, damage: 0, weapon: 'Mains nues', attackRoll };
+    }
+
+    // Attaque avec arme - utiliser la méthode calculateDamage de l'arme
+    const abilityModifier = Math.floor((attacker.stats[weapon.stat] - 10) / 2);
+    const attackRoll = this.dependencies.diceRollingService.roll('1d20') + abilityModifier;
+
+    if (attackRoll >= target.armorClass) {
+      const damage = weapon.calculateDamage(this.dependencies.diceRollingService, abilityModifier);
+      return { hit: true, damage, weapon: weapon.name, attackRoll };
+    }
+
+    return { hit: false, damage: 0, weapon: weapon.name, attackRoll };
+  }
+
+  /**
+   * Appliquer une attaque unifié (fonction pure)
+   * Remplace TOUTES les méthodes d'attaque existantes
+   */
+  private applyAttackActionUnified(
+    entities: CombatEntity[],
+    action: CombatAction,
+    currentEntity: CombatEntity
+  ): { entities: CombatEntity[], narratives: NarrativeMessage[] } {
+    if (!action.targetId) return { entities, narratives: [] };
+
+    const attacker = entities.find(e => e.id === action.entityId);
+    const target = entities.find(e => e.id === action.targetId);
+
+    if (!attacker || !target) return { entities, narratives: [] };
+
+    // Une seule résolution d'attaque
+    const result = this.resolveAttack(attacker, target);
+
+    // Appliquer les changements (immutable)
+    let updatedEntities = entities;
+
+    if (result.hit) {
+      const newTargetHP = Math.max(0, target.hitPoints - result.damage);
+      updatedEntities = entities.map(e => {
+        if (e.id === target.id) {
+          return { ...e, hitPoints: newTargetHP, isDead: newTargetHP === 0 };
+        }
+        if (e.id === attacker.id) {
+          return { ...e, actionsRemaining: { ...e.actionsRemaining, action: false } };
+        }
+        return e;
+      });
+    } else {
+      updatedEntities = entities.map(e =>
+        e.id === attacker.id
+          ? { ...e, actionsRemaining: { ...e.actionsRemaining, action: false } }
+          : e
+      );
+    }
+
+    // Générer narratif avec nom de l'arme
+    const narrative = this.generateAttackNarrative(attacker, target, result.attackRoll, result.hit ? result.damage : undefined, result.weapon);
+
+    return { entities: updatedEntities, narratives: [narrative] };
+  }
+
+  /**
+   * DEPRECATED - Appliquer une attaque (fonction pure)
    */
   private applyAttackAction(
     entities: CombatEntity[], 
@@ -345,14 +593,15 @@ export class CombatEngine {
     
     if (!attacker || !target) return entities;
 
-    // Calculer l'attaque
+    // Calculer l'attaque avec la bonne caractéristique
+    const attackAbility = this.getAttackAbility(attacker);
     const attackRoll = this.dependencies.diceRollingService.roll('1d20') + 
-                      Math.floor((attacker.abilities.strength - 10) / 2);
+                      Math.floor((attacker.stats[attackAbility] - 10) / 2);
     
     if (attackRoll >= target.armorClass) {
       // Touché ! Calculer les dégâts
-      const damage = this.dependencies.diceRollingService.roll('1d6') + 
-                    Math.floor((attacker.abilities.strength - 10) / 2);
+      const damage = Math.max(1, this.dependencies.diceRollingService.roll('1d6') + 
+                    Math.floor((attacker.stats[attackAbility] - 10) / 2));
       
       const newHitPoints = Math.max(0, target.hitPoints - damage);
       const isDead = newHitPoints === 0;
@@ -397,6 +646,69 @@ export class CombatEngine {
   }
 
   /**
+   * Appliquer une attaque avec génération de narratifs (fonction pure)
+   */
+  private applyAttackActionWithNarratives(
+    entities: CombatEntity[],
+    action: CombatAction,
+    currentEntity: CombatEntity
+  ): { entities: CombatEntity[], narratives: NarrativeMessage[] } {
+    if (!action.targetId) return { entities, narratives: [] };
+
+    const attacker = entities.find(e => e.id === action.entityId);
+    const target = entities.find(e => e.id === action.targetId);
+    
+    if (!attacker || !target) return { entities, narratives: [] };
+
+    // Calculer l'attaque (un seul roll pour cohérence)
+    const attackAbility = this.getAttackAbility(attacker);
+    const attackRoll = this.dependencies.diceRollingService.roll('1d20') + 
+                      Math.floor((attacker.stats[attackAbility] - 10) / 2);
+    
+    const narratives: NarrativeMessage[] = [];
+    let updatedEntities: CombatEntity[];
+    
+    if (attackRoll >= target.armorClass) {
+      // Touché ! Calculer les dégâts
+      const damage = Math.max(1, this.dependencies.diceRollingService.roll('1d6') + 
+                    Math.floor((attacker.stats[attackAbility] - 10) / 2));
+      
+      const newHitPoints = Math.max(0, target.hitPoints - damage);
+      const isDead = newHitPoints === 0;
+
+      // Appliquer les changements
+      updatedEntities = entities.map(entity => {
+        if (entity.id === target.id) {
+          return { ...entity, hitPoints: newHitPoints, isDead };
+        }
+        if (entity.id === attacker.id) {
+          return { 
+            ...entity, 
+            actionsRemaining: { ...entity.actionsRemaining, action: false } 
+          };
+        }
+        return entity;
+      });
+
+      // Générer le narratif d'attaque réussie
+      narratives.push(this.generateAttackNarrative(attacker, target, attackRoll, damage));
+
+    } else {
+      // Raté
+      updatedEntities = entities.map(entity => 
+        entity.id === attacker.id 
+          ? { ...entity, actionsRemaining: { ...entity.actionsRemaining, action: false } }
+          : entity
+      );
+
+      // Générer le narratif d'attaque ratée
+      narratives.push(this.generateAttackNarrative(attacker, target, attackRoll));
+    }
+
+    return { entities: updatedEntities, narratives };
+  }
+
+  /**
    * Appliquer un mouvement (fonction pure)
    */
   private applyMoveAction(
@@ -404,8 +716,58 @@ export class CombatEngine {
     action: CombatAction
   ): CombatEntity[] {
     if (!action.position) return entities;
+    
+    const entity = entities.find(e => e.id === action.entityId);
+    if (!entity) return entities;
+    
+    // Calculer la distance du mouvement
+    const distance = Math.abs(action.position.x - entity.position.x) + 
+                    Math.abs(action.position.y - entity.position.y);
+    const movementCost = distance * 5; // 5 pieds par case
+    
+    // Vérifier si le mouvement est possible
+    if (movementCost > entity.actionsRemaining.movement) {
+      return entities; // Mouvement impossible
+    }
 
-    return entities.map(entity =>
+    return entities.map(e =>
+      e.id === action.entityId
+        ? { 
+            ...e, 
+            position: { x: action.position!.x, y: action.position!.y },
+            actionsRemaining: { 
+              ...e.actionsRemaining, 
+              movement: e.actionsRemaining.movement - movementCost
+            }
+          }
+        : e
+    );
+  }
+
+  /**
+   * Appliquer action combinée mouvement + attaque (fonction pure)
+   * Permet à l'IA de se déplacer ET attaquer dans le même tour
+   */
+  private applyMoveAndAttackAction(
+    entities: CombatEntity[], 
+    action: CombatAction
+  ): CombatEntity[] {
+    if (!action.position || !action.targetId) return entities;
+
+    const attacker = entities.find(e => e.id === action.entityId);
+    const target = entities.find(e => e.id === action.targetId);
+    
+    if (!attacker || !target) return entities;
+
+    this.dependencies.logger.info('COMBAT_ENGINE', 'Move and attack action', {
+      attackerName: attacker.name,
+      targetName: target.name,
+      newPosition: action.position,
+      oldPosition: attacker.position
+    });
+
+    // Étape 1: Appliquer le mouvement
+    let updatedEntities = entities.map(entity =>
       entity.id === action.entityId
         ? { 
             ...entity, 
@@ -417,6 +779,182 @@ export class CombatEngine {
           }
         : entity
     );
+
+    // Étape 2: Appliquer l'attaque depuis la nouvelle position
+    const movedAttacker = updatedEntities.find(e => e.id === action.entityId)!;
+    const attackAbility = this.getAttackAbility(movedAttacker);
+    const attackRoll = this.dependencies.diceRollingService.roll('1d20') + 
+                      Math.floor((movedAttacker.stats[attackAbility] - 10) / 2);
+    
+    if (attackRoll >= target.armorClass) {
+      // Touché ! Calculer les dégâts
+      const damage = Math.max(1, this.dependencies.diceRollingService.roll('1d6') + 
+                    Math.floor((movedAttacker.stats[attackAbility] - 10) / 2));
+      
+      const newHitPoints = Math.max(0, target.hitPoints - damage);
+
+      this.dependencies.logger.info('COMBAT_ENGINE', 'Move and attack hit', {
+        attackerName: movedAttacker.name,
+        targetName: target.name,
+        attackRoll,
+        targetAC: target.armorClass,
+        damage,
+        newHitPoints
+      });
+
+      // Appliquer les dégâts et consommer l'action
+      updatedEntities = updatedEntities.map(entity => {
+        if (entity.id === target.id) {
+          return { 
+            ...entity, 
+            hitPoints: newHitPoints, 
+            isDead: newHitPoints === 0 
+          };
+        }
+        if (entity.id === action.entityId) {
+          return { 
+            ...entity, 
+            actionsRemaining: { 
+              ...entity.actionsRemaining, 
+              action: false 
+            }
+          };
+        }
+        return entity;
+      });
+    } else {
+      this.dependencies.logger.info('COMBAT_ENGINE', 'Move and attack miss', {
+        attackerName: movedAttacker.name,
+        targetName: target.name,
+        attackRoll,
+        targetAC: target.armorClass
+      });
+
+      // Manqué, mais consommer quand même l'action
+      updatedEntities = updatedEntities.map(entity =>
+        entity.id === action.entityId
+          ? { 
+              ...entity, 
+              actionsRemaining: { 
+                ...entity.actionsRemaining, 
+                action: false 
+              }
+            }
+          : entity
+      );
+    }
+
+    return updatedEntities;
+  }
+
+  /**
+   * Appliquer action combinée mouvement + attaque AVEC narratifs (fonction pure)
+   * Version qui génère les narratifs avec les vrais résultats des dés
+   */
+  private applyMoveAndAttackActionWithNarratives(
+    entities: CombatEntity[], 
+    action: CombatAction,
+    currentEntity: CombatEntity
+  ): { entities: CombatEntity[], narratives: NarrativeMessage[] } {
+    if (!action.position || !action.targetId) {
+      return { entities, narratives: [] };
+    }
+
+    const attacker = entities.find(e => e.id === action.entityId);
+    const target = entities.find(e => e.id === action.targetId);
+    
+    if (!attacker || !target) {
+      return { entities, narratives: [] };
+    }
+
+    const narratives: NarrativeMessage[] = [];
+
+    // Étape 1: Appliquer le mouvement + narratif
+    let updatedEntities = entities.map(entity =>
+      entity.id === action.entityId
+        ? { 
+            ...entity, 
+            position: { x: action.position!.x, y: action.position!.y },
+            actionsRemaining: { 
+              ...entity.actionsRemaining, 
+              movement: Math.max(0, entity.actionsRemaining.movement - 5) 
+            }
+          }
+        : entity
+    );
+
+    // Narratif de mouvement
+    narratives.push(this.generateMoveNarrative(currentEntity, currentEntity.position, action.position));
+
+    // Étape 2: Appliquer l'attaque depuis la nouvelle position
+    const movedAttacker = updatedEntities.find(e => e.id === action.entityId)!;
+    const attackAbility = this.getAttackAbility(movedAttacker);
+    const attackRoll = this.dependencies.diceRollingService.roll('1d20') + 
+                      Math.floor((movedAttacker.stats[attackAbility] - 10) / 2);
+    
+    let damage = 0;
+    if (attackRoll >= target.armorClass) {
+      // Touché ! Calculer les dégâts
+      damage = Math.max(1, this.dependencies.diceRollingService.roll('1d6') + 
+               Math.floor((movedAttacker.stats[attackAbility] - 10) / 2));
+      
+      const newHitPoints = Math.max(0, target.hitPoints - damage);
+
+      this.dependencies.logger.info('COMBAT_ENGINE', 'Move and attack hit', {
+        attackerName: movedAttacker.name,
+        targetName: target.name,
+        attackRoll,
+        targetAC: target.armorClass,
+        damage,
+        newHitPoints
+      });
+
+      // Appliquer les dégâts et consommer l'action
+      updatedEntities = updatedEntities.map(entity => {
+        if (entity.id === target.id) {
+          return { 
+            ...entity, 
+            hitPoints: newHitPoints, 
+            isDead: newHitPoints === 0 
+          };
+        }
+        if (entity.id === action.entityId) {
+          return { 
+            ...entity, 
+            actionsRemaining: { 
+              ...entity.actionsRemaining, 
+              action: false 
+            }
+          };
+        }
+        return entity;
+      });
+    } else {
+      this.dependencies.logger.info('COMBAT_ENGINE', 'Move and attack miss', {
+        attackerName: movedAttacker.name,
+        targetName: target.name,
+        attackRoll,
+        targetAC: target.armorClass
+      });
+
+      // Manqué, mais consommer quand même l'action
+      updatedEntities = updatedEntities.map(entity =>
+        entity.id === action.entityId
+          ? { 
+              ...entity, 
+              actionsRemaining: { 
+                ...entity.actionsRemaining, 
+                action: false 
+              }
+            }
+          : entity
+      );
+    }
+
+    // Narratif d'attaque avec les vrais résultats
+    narratives.push(this.generateAttackNarrative(currentEntity, target, attackRoll, damage));
+
+    return { entities: updatedEntities, narratives };
   }
 
   /**
@@ -439,6 +977,103 @@ export class CombatEngine {
           }
         : entity
     );
+  }
+
+  // === HELPERS POUR ARMES ===
+
+  /**
+   * TODO: Intégrer avec le système d'armes complet plus tard
+   * Pour l'instant, utiliser Force par défaut (D&D classique)
+   */
+  private getAttackAbility(entity: CombatEntity): keyof Stats {
+    return 'strength';
+  }
+
+  // === GÉNÉRATION DE NARRATIFS (FONCTIONNALITÉ 3) ===
+
+  /**
+   * Générer un message narratif pour un mouvement
+   */
+  private generateMoveNarrative(entity: CombatEntity, from: Position, to: Position): NarrativeMessage {
+    const distance = Math.abs(to.x - from.x) + Math.abs(to.y - from.y);
+    
+    return {
+      id: generateNarrativeId(),
+      type: 'movement',
+      timestamp: new Date(),
+      actors: [entity.name],
+      action: `se déplace de (${from.x},${from.y}) vers (${to.x},${to.y})`,
+      result: `Nouvelle position : (${to.x},${to.y})`,
+      details: {
+        distance: distance * 5, // 5 feet par case
+        movementRemaining: Math.max(0, entity.actionsRemaining.movement - (distance * 5)),
+        entityType: entity.type
+      }
+    };
+  }
+
+  /**
+   * Générer un message narratif pour une attaque
+   */
+  private generateAttackNarrative(attacker: CombatEntity, target: CombatEntity, attackRoll: number, damage?: number, weaponName: string = 'arme'): NarrativeMessage {
+    const hit = attackRoll >= target.armorClass;
+    const isCritical = attackRoll === 20;
+    
+    if (hit) {
+      const finalDamage = damage || 0;
+      const remainingHP = Math.max(0, target.hitPoints - finalDamage);
+      
+      return {
+        id: generateNarrativeId(),
+        type: isCritical ? 'critical_hit' : 'attack_success',
+        timestamp: new Date(),
+        actors: [attacker.name, target.name],
+        action: `${attacker.name} attaque ${target.name} avec ${weaponName}`,
+        result: isCritical 
+          ? `CRITIQUE ! ${finalDamage} dégâts (${remainingHP}/${target.maxHitPoints} PV restants)`
+          : `Touché ! ${finalDamage} dégâts (${remainingHP}/${target.maxHitPoints} PV restants)`,
+        details: {
+          attackRoll,
+          targetAC: target.armorClass,
+          damage: finalDamage,
+          critical: isCritical,
+          targetDefeated: remainingHP === 0
+        }
+      };
+    } else {
+      return {
+        id: generateNarrativeId(),
+        type: 'attack_miss',
+        timestamp: new Date(),
+        actors: [attacker.name, target.name],
+        action: `${attacker.name} attaque ${target.name} avec ${weaponName}`,
+        result: 'Manqué !',
+        details: {
+          attackRoll,
+          targetAC: target.armorClass
+        }
+      };
+    }
+  }
+
+  /**
+   * Générer un message narratif pour début de tour
+   */
+  private generateTurnStartNarrative(entity: CombatEntity): NarrativeMessage {
+    return {
+      id: generateNarrativeId(),
+      type: 'turn_start',
+      timestamp: new Date(),
+      actors: [entity.name],
+      action: 'commence son tour',
+      result: `Actions disponibles : ${entity.actionsRemaining.action ? 'Action' : ''}${entity.actionsRemaining.bonusAction ? ', Action Bonus' : ''}${entity.actionsRemaining.movement > 0 ? `, Mouvement (${entity.actionsRemaining.movement} pieds)` : ''}`.replace(/^, /, ''),
+      details: {
+        entityType: entity.type,
+        hitPoints: `${entity.hitPoints}/${entity.maxHitPoints}`,
+        round: this.round,
+        initiative: entity.initiative
+      }
+    };
   }
 
   /**
@@ -485,6 +1120,8 @@ export class CombatEngine {
         return entity.actionsRemaining.action;
       case 'move': 
         return entity.actionsRemaining.movement > 0;
+      case 'move_and_attack':
+        return entity.actionsRemaining.action && entity.actionsRemaining.movement > 0;
       case 'end_turn':
         return true; // Toujours possible
       case 'cast_spell':

@@ -10,9 +10,9 @@ import { CombatGridNew } from './CombatGridNew';
 import { CombatPanelNew } from './CombatPanelNew';
 import { GameLog } from './GameLog';
 import { useCombatGame } from '../hooks/useCombatGame';
-import { DIContainer } from '../../infrastructure/container/DIContainer';
+// ✅ ÉTAPE 2.7 - Supprimé import DIContainer direct (violation architecturale)
 import type { CombatEntityView } from '../types/CombatTypes';
-import type { CombatEntity } from '../../domain/entities/CombatEngine';
+// ✅ ÉTAPE 2.7 - Supprimé import Domain direct
 import { CombatViewAdapter } from '../adapters/CombatViewAdapter';
 import type { NarrativeMessageView } from '../types/NarrativeTypes';
 
@@ -31,113 +31,39 @@ export const CombatScenePhoenix: React.FC<CombatScenePhoenixProps> = ({
   sceneTitle = "Combat Phoenix",
   sceneDescription = "Système de combat nouvelle génération"
 }) => {
-  // État Phoenix
-  const combatGameUseCase = DIContainer.getInstance().get('CombatGameUseCase');
-  const combat = useCombatGame(combatGameUseCase);
+  // ✅ ÉTAPE 2.7 - Hook pur sans accès direct au DIContainer
+  const combat = useCombatGame();
   
   // État local pour le mode mouvement
   const [isMovementMode, setIsMovementMode] = useState(false);
   
-  // Logs de combat (View Models purs)
-  const [combatLogs, setCombatLogs] = useState<NarrativeMessageView[]>([]);
+  // ✅ ÉTAPE 2.7 - Auto-initialisation du combat depuis la scène
+  useEffect(() => {
+    if (!combat.combatState) {
+      combat.initializeCombatFromScene('forest_ambush');
+    }
+  }, []);
+  
+  // ✅ FONCTIONNALITÉ 3 - Utilisation des narratifs du Domain via useCombatGame
 
-  // ✅ QUICK FIX: Créer des entités Domain complètes pour les tests
-  const createTestEntities = (): CombatEntity[] => {
-    const player: CombatEntity = {
-      id: 'player_1',
-      name: 'Héros',
-      type: 'player',
-      level: 3,
-      hitPoints: 25,
-      maxHitPoints: 25,
-      armorClass: 15,
-      speed: 30,
-      initiative: 0,
-      abilities: { // ✅ CRUCIAL: Ajout des abilities manquantes
-        strength: 16,
-        dexterity: 14,
-        constitution: 15,
-        intelligence: 12,
-        wisdom: 13,
-        charisma: 8
-      },
-      position: { x: 2, y: 4 },
-      isActive: true,
-      isDead: false,
-      actionsRemaining: {
-        action: true,
-        bonusAction: true,
-        reaction: true,
-        movement: 30
-      }
-    };
+  // ✅ ÉTAPE 2.7 - VIOLATION ARCHITECTURALE SUPPRIMÉE
+  // Ancienne fonction createTestEntities() supprimée 
+  // Le combat utilise maintenant les vraies données via CombatFactory
 
-    const enemy1: CombatEntity = {
-      id: 'enemy_1',
-      name: 'Gobelin',
-      type: 'enemy',
-      level: 1,
-      hitPoints: 7,
-      maxHitPoints: 7,
-      armorClass: 15,
-      speed: 30,
-      initiative: 0,
-      abilities: { // ✅ CRUCIAL: Abilities pour les ennemis aussi
-        strength: 8,
-        dexterity: 14,
-        constitution: 10,
-        intelligence: 10,
-        wisdom: 8,
-        charisma: 8
-      },
-      position: { x: 8, y: 4 },
-      isActive: true,
-      isDead: false,
-      actionsRemaining: {
-        action: true,
-        bonusAction: true,
-        reaction: true,
-        movement: 30
-      }
-    };
-
-    const enemy2: CombatEntity = {
-      id: 'enemy_2',
-      name: 'Archer Gobelin',
-      type: 'enemy',
-      level: 1,
-      hitPoints: 5,
-      maxHitPoints: 5,
-      armorClass: 13,
-      speed: 30,
-      initiative: 0,
-      abilities: { // ✅ CRUCIAL: Abilities pour archer aussi
-        strength: 6,
-        dexterity: 16, // Archer = plus agile
-        constitution: 8,
-        intelligence: 10,
-        wisdom: 12,
-        charisma: 6
-      },
-      position: { x: 10, y: 3 },
-      isActive: true,
-      isDead: false,
-      actionsRemaining: {
-        action: true,
-        bonusAction: true,
-        reaction: true,
-        movement: 30
-      }
-    };
-
-    return [player, enemy1, enemy2];
-  };
-
-  // Gérer le clic sur une cellule de la grille
+  // ✅ FONCTIONNALITÉ 1.2 - Gérer interactions grille selon contexte
   const handleCellClick = (position: { x: number; y: number }) => {
     if (isMovementMode && combat.isPlayerTurn) {
       combat.executeMove(position);
       setIsMovementMode(false);
+    }
+  };
+
+  const handleCellInteraction = (position: { x: number; y: number }, interactionType: 'move' | 'target') => {
+    if (interactionType === 'move') {
+      combat.confirmAction(position);
+    } else if (interactionType === 'target') {
+      // Position.x contient l'ID de l'entité dans ce cas
+      combat.confirmAction(position.x as any);
     }
   };
 
@@ -146,19 +72,7 @@ export const CombatScenePhoenix: React.FC<CombatScenePhoenixProps> = ({
     setIsMovementMode(!isMovementMode);
   };
 
-  // Ajouter un log (View Models purs)
-  useEffect(() => {
-    if (combat.combatState) {
-      const newLog: NarrativeMessageView = {
-        id: Date.now().toString(),
-        content: `Round ${combat.combatState.round} - Tour de ${combat.currentEntity?.name}`,
-        type: 'combat',
-        timestamp: new Date(),
-        icon: '⚔️'
-      };
-      setCombatLogs(prev => [...prev.slice(-50), newLog]); // Garder max 50 logs
-    }
-  }, [combat.combatState?.currentTurnIndex]);
+  // ✅ FONCTIONNALITÉ 3 - Les logs sont maintenant automatiquement générés par le Domain
 
   // Calculer les informations de combat
   const combatInfo = combat.combatState ? {
@@ -242,6 +156,10 @@ export const CombatScenePhoenix: React.FC<CombatScenePhoenixProps> = ({
               isMovementMode={isMovementMode}
               onCellClick={handleCellClick}
               gridDimensions={{ width: 12, height: 8 }}
+              
+              // ✅ FONCTIONNALITÉ 1.2 - Nouvelles props pour micro-états
+              playerActionContext={combat.playerActionContext}
+              onCellInteraction={handleCellInteraction}
             />
           </div>
         </div>
@@ -262,7 +180,6 @@ export const CombatScenePhoenix: React.FC<CombatScenePhoenixProps> = ({
           }}>
             <CombatPanelNew
               combat={combat}
-              onCreateTestEntities={createTestEntities}
             />
           </div>
 
@@ -290,16 +207,12 @@ export const CombatScenePhoenix: React.FC<CombatScenePhoenixProps> = ({
               fontSize: '12px',
               color: '#ccc'
             }}>
-              {combatLogs.length === 0 ? (
-                <p style={{ textAlign: 'center', color: '#666' }}>En attente du combat...</p>
-              ) : (
-                combatLogs.map(log => (
-                  <div key={log.id} style={{ marginBottom: '5px' }}>
-                    <span style={{ marginRight: '5px' }}>{log.icon}</span>
-                    {log.content}
-                  </div>
-                ))
-              )}
+              <GameLog 
+                messages={combat.narratives} 
+                height="100%" 
+                maxMessages={20}
+                autoScroll={true}
+              />
             </div>
           </div>
         </div>

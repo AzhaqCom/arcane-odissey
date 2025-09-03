@@ -2,8 +2,7 @@
   Bonjour. Ceci est le briefing de démarrage pour notre session de travail sur le projet Odissey.
 
   Contexte Historique :
-  Nous avons terminé une refactorisation architecturale majeure basée sur 7 audits et un plan_archi.md. Ce plan est
-  maintenant 100% complété et validé. L'architecture du projet est saine, pure, et suit des règles strictes.
+L'architecture du projet est saine, pure, et suit des règles strictes.
 
   Ta Mission Continue :
   Ton rôle est de m'aider à construire les fonctionnalités du projet en te conformant impérativement aux règles et au

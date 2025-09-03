@@ -13,6 +13,12 @@ export interface ICharacterRepository {
   delete(id: string): Promise<void>;
   getPlayerCharacters(): Promise<Character[]>;
   getCompanions(): Promise<Character[]>;
+  
+  /**
+   * Obtenir le personnage joueur actuel (pour le combat)
+   */
+  getCurrentCharacter(): Promise<Character | null>;
+  
   getEnemyDataSourceById(id: string): Promise<DomainEnemyDataSource | null>;
 
   /**

@@ -2,8 +2,9 @@
  * DOMAIN ENTITY - Character
  * Logique métier pure pour un personnage, sans dépendances infrastructure.
  */
-import type { AbilityScores, Position } from '../types/core';
+import type { Stats, Position } from '../types/core';
 import type { InventorySpec, CharacterCreationProps, ClassSpec } from '../types/Character';
+import type { CombatEntity } from './CombatEngine';
 import { SpellSlots } from './Spell';
 
 // Constantes de progression (déplacées dans le domaine)
@@ -25,14 +26,14 @@ export class Character {
   public readonly classId: string;
   public readonly classSpec: ClassSpec;
   public readonly raceId: string;
-  public readonly baseStats: AbilityScores;
+  public readonly baseStats: Stats;
   public readonly gold: number;
   public readonly position?: Position;
   public readonly inventory: InventorySpec;
 
   // PHASE 1 - Propriétés manquantes pour la compilation
   public readonly characterClass: string;
-  public readonly abilities: AbilityScores;
+  public readonly abilities: Stats;
   
   public readonly currentHP: number;
   public readonly maxHP: number;
@@ -76,10 +77,10 @@ export class Character {
     return PROFICIENCY_BONUS_PER_LEVEL[this.level] || 0;
   }
 
-  public getAbilityModifiers(): Record<keyof AbilityScores, number> {
-    const modifiers = {} as Record<keyof AbilityScores, number>;
+  public getAbilityModifiers(): Record<keyof Stats, number> {
+    const modifiers = {} as Record<keyof Stats, number>;
     for (const key in this.baseStats) {
-      const abilityKey = key as keyof AbilityScores;
+      const abilityKey = key as keyof Stats;
       modifiers[abilityKey] = Math.floor((this.baseStats[abilityKey] - 10) / 2);
     }
     return modifiers;
@@ -192,5 +193,34 @@ export class Character {
 
   formatHealthText(): string {
     return `${this.currentHP}/${this.maxHP} HP`;
+  }
+
+  /**
+   * ÉTAPE 1.2 - Conversion Character vers CombatEntity
+   * Respecte ARCHITECTURE_GUIDELINES.md - Règle #1 Domain-First
+   * Méthode immutable qui retourne une CombatEntity pour le combat
+   */
+  toCombatEntity(): CombatEntity {
+    return {
+      id: this.id,
+      name: this.name,
+      type: 'player',
+      level: this.level,
+      hitPoints: this.currentHP,
+      maxHitPoints: this.maxHP,
+      armorClass: this.armorClass,
+      speed: this.speed,
+      initiative: 0, // Sera calculé au début du combat
+      stats: this.abilities, // Utilise les stats du personnage
+      position: this.position || { x: 0, y: 0 }, // Position par défaut si aucune
+      isActive: true,
+      isDead: this.isDead,
+      actionsRemaining: {
+        action: true,
+        bonusAction: true,
+        reaction: true,
+        movement: this.speed * 5 // Convertir cases → pieds D&D (1 case = 5 pieds)
+      }
+    };
   }
 }

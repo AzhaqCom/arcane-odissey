@@ -113,7 +113,7 @@ export class WeaponRepository implements IWeaponRepository {
       {
         dice: data.damage.dice,
         bonus: data.damage.bonus,
-        type: data.damage.type
+        type: data.stat  // Le type d'ability score est le stat utilisé
       },
       data.damageType,
       data.properties as any[], // Cast nécessaire car les types sont légèrement différents

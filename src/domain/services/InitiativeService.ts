@@ -20,7 +20,7 @@ export class InitiativeService {
    * @returns Résultat d'initiative
    */
   calculateInitiative(character: Character): number {
-    const dexterityModifier = AbilityCalculationService.calculateModifier(character.abilities.dexterity);
+    const dexterityModifier = AbilityCalculationService.calculateModifier(character.stats.dexterity);
     const roll = this._diceRollingService.rollD20();
     
     return roll + dexterityModifier;
@@ -50,8 +50,8 @@ export class InitiativeService {
       }
       
       // En cas d'égalité, plus haute Dextérité l'emporte
-      const aDexMod = AbilityCalculationService.calculateModifier(a.character.abilities.dexterity);
-      const bDexMod = AbilityCalculationService.calculateModifier(b.character.abilities.dexterity);
+      const aDexMod = AbilityCalculationService.calculateModifier(a.character.stats.dexterity);
+      const bDexMod = AbilityCalculationService.calculateModifier(b.character.stats.dexterity);
       
       return bDexMod - aDexMod;
     });

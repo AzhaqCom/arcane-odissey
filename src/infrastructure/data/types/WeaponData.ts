@@ -10,7 +10,7 @@ export interface WeaponData {
   readonly damage: {
     readonly dice: string;
     readonly bonus: number;
-    readonly type: 'strength' | 'dexterity' | 'intelligence';
+ 
   };
   readonly damageType: 'piercing' | 'slashing' | 'bludgeoning' | 'fire' | 'cold' | 'lightning' | 'acid' | 'poison' | 'radiant' | 'necrotic' | 'psychic' | 'thunder' | 'force';
   readonly properties: string[];

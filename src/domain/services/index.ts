@@ -5,3 +5,4 @@
 
 export type { ILogger } from './ILogger';
 export { GameNarrativeService } from './GameNarrativeService';
+export { WeaponResolutionService } from './WeaponResolutionService';

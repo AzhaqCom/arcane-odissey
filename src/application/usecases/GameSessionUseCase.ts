@@ -68,18 +68,18 @@ export class GameSessionUseCase {
     error?: string;
   }> {
     try {
-      logger.ui('GameSessionUseCase: Initializing game session...');
+      // logger.ui('GameSessionUseCase: Initializing game session...');
 
       // === PHASE 1: AUTO-SAVE DETECTION (logique métier) ===
       const autoSave = await this.gameUseCase.getCurrentSession();
       let gameSession: GameSession;
 
       if (autoSave) {
-        logger.ui('GameSessionUseCase: Loading auto-save');
+        // logger.ui('GameSessionUseCase: Loading auto-save');
         this.gameUseCase.loadGame(autoSave);
         gameSession = autoSave;
       } else {
-        logger.ui('GameSessionUseCase: Creating new game session');
+        // logger.ui('GameSessionUseCase: Creating new game session');
         
         // === PHASE 2: GAME INITIALIZATION (configuration métier) ===
         gameSession = await this.gameUseCase.initializeGame({
@@ -110,10 +110,10 @@ export class GameSessionUseCase {
         // )
       ];
 
-      logger.ui('GameSessionUseCase: Game session initialized successfully', {
-        sceneId: gameSession.currentSceneId,
-        phase: gameSession.currentPhase
-      });
+      // logger.ui('GameSessionUseCase: Game session initialized successfully', {
+      //   sceneId: gameSession.currentSceneId,
+      //   phase: gameSession.currentPhase
+      // });
 
       return {
         success: true,
@@ -145,17 +145,17 @@ export class GameSessionUseCase {
   async refreshSessionState(): Promise<GameSessionState | null> {
     const currentSession = this.gameUseCase.getCurrentSession();
     if (!currentSession) {
-      logger.ui('GameSessionUseCase: No current session to refresh');
+      // logger.ui('GameSessionUseCase: No current session to refresh');
       return null;
     }
 
     try {
-      logger.ui('GameSessionUseCase: Refreshing session state...');
+      // logger.ui('GameSessionUseCase: Refreshing session state...');
 
       // Récupérer l'état de jeu actuel
       const gameState = await this.gameUseCase.getGameState();
       if (!gameState) {
-        logger.ui('GameSessionUseCase: No game state available');
+        // logger.ui('GameSessionUseCase: No game state available');
         return null;
       }
 
@@ -163,11 +163,11 @@ export class GameSessionUseCase {
       // Pas besoin de rappeler analyzeScene - on utilise currentSceneAnalysis de gameState
       const sceneAnalysis = gameState.currentSceneAnalysis;
       if (!sceneAnalysis) {
-        logger.ui('GameSessionUseCase: Failed to get scene analysis from game state');
+        // logger.ui('GameSessionUseCase: Failed to get scene analysis from game state');
         return null;
       }
 
-      logger.ui('GameSessionUseCase: Session state refreshed successfully');
+      // logger.ui('GameSessionUseCase: Session state refreshed successfully');
 
       return {
         gameState,
@@ -205,10 +205,10 @@ export class GameSessionUseCase {
     narrativeMessage?: NarrativeMessage;
   }> {
     try {
-      logger.ui('GameSessionUseCase: Processing scene transition', { 
-        choiceId, 
-        targetSceneId 
-      });
+      // logger.ui('GameSessionUseCase: Processing scene transition', { 
+      //   choiceId, 
+      //   targetSceneId 
+      // });
 
       // Effectuer la transition via GameUseCase
       const success = await this.gameUseCase.transitionToScene(targetSceneId, choiceId);
@@ -223,7 +223,7 @@ export class GameSessionUseCase {
           'normal'
         );
 
-        logger.ui('GameSessionUseCase: Scene transition completed successfully');
+        // logger.ui('GameSessionUseCase: Scene transition completed successfully');
         
         return { 
           success: true, 
@@ -231,7 +231,7 @@ export class GameSessionUseCase {
           narrativeMessage
         };
       } else {
-        logger.ui('GameSessionUseCase: Scene transition failed');
+        // logger.ui('GameSessionUseCase: Scene transition failed');
         return { success: false };
       }
       
@@ -254,7 +254,7 @@ export class GameSessionUseCase {
     newState?: GameSessionState;
   }> {
     try {
-      logger.ui('GameSessionUseCase: Processing rest request', { restType });
+      // logger.ui('GameSessionUseCase: Processing rest request', { restType });
 
       // Effectuer le repos via GameUseCase
       const result = await this.gameUseCase.rest({
@@ -275,10 +275,10 @@ export class GameSessionUseCase {
         // Rafraîchir l'état après repos
         const newState = await this.refreshSessionState();
 
-        logger.ui('GameSessionUseCase: Rest completed successfully', {
-          hpRestored: result.hpRestored,
-          timeAdvanced: result.timeAdvanced
-        });
+        // logger.ui('GameSessionUseCase: Rest completed successfully', {
+        //   hpRestored: result.hpRestored,
+        //   timeAdvanced: result.timeAdvanced
+        // });
         
         return {
           success: true,
@@ -286,7 +286,7 @@ export class GameSessionUseCase {
           newState: newState || undefined
         };
       } else {
-        logger.ui('GameSessionUseCase: Rest failed', { errors: result.errors });
+        // logger.ui('GameSessionUseCase: Rest failed', { errors: result.errors });
         return { success: false };
       }
 
@@ -305,7 +305,7 @@ export class GameSessionUseCase {
     narrativeMessage?: NarrativeMessage;
   }> {
     try {
-      logger.ui('GameSessionUseCase: Processing save request');
+      // logger.ui('GameSessionUseCase: Processing save request');
 
       // Effectuer la sauvegarde via GameUseCase
       const success = await this.gameUseCase.saveGame();
@@ -317,14 +317,14 @@ export class GameSessionUseCase {
           'low'
         );
 
-        logger.ui('GameSessionUseCase: Game saved successfully');
+        // logger.ui('GameSessionUseCase: Game saved successfully');
         
         return {
           success: true,
           narrativeMessage
         };
       } else {
-        logger.ui('GameSessionUseCase: Save failed');
+        // logger.ui('GameSessionUseCase: Save failed');
         return { success: false };
       }
       

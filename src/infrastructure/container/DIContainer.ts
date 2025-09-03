@@ -14,6 +14,7 @@ import { SaveGameStore } from '../stores/SaveGameStore';
 import { WeaponRepository } from '../repositories/WeaponRepository';
 import { SpellRepository } from '../repositories/SpellRepository';
 import { CharacterRepository } from '../repositories/CharacterRepository';
+import { EnemyRepository } from '../repositories/EnemyRepository';
 import { SceneRepository } from '../repositories/SceneRepository';
 import { GameSessionRepository } from '../repositories/GameSessionRepository';
 import { logger } from '../services/Logger';
@@ -27,6 +28,7 @@ import { TacticalCalculationService } from '../../domain/services/TacticalCalcul
 import { GameNarrativeService } from '../../domain/services/GameNarrativeService';
 // ActionPrioritizer et ThreatAssessment supprimés (incompatibles avec Phoenix)
 import { SimpleAIService } from '../../domain/services/SimpleAIService';
+import { WeaponResolutionService } from '../../domain/services/WeaponResolutionService';
 import type { IRandomNumberGenerator } from '../../domain/services/DiceRollingService';
 // import { Combat } from '../../domain/entities/Combat'; // ✅ SUPPRIMÉ - Utilise CombatEngine maintenant
 
@@ -95,12 +97,14 @@ export class DIContainer {
     const weaponRepository = new WeaponRepository(gameDataStore);
     const spellRepository = new SpellRepository(gameDataStore);
     const characterRepository = new CharacterRepository(gameDataStore, saveGameStore);
+    const enemyRepository = new EnemyRepository();
     const sceneRepository = new SceneRepository();
     const gameSessionRepository = new GameSessionRepository();
 
     this.register('WeaponRepository', weaponRepository);
     this.register('SpellRepository', spellRepository);
     this.register('CharacterRepository', characterRepository);
+    this.register('EnemyRepository', enemyRepository);
     this.register('SceneRepository', sceneRepository);
     this.register('GameSessionRepository', gameSessionRepository);
 
@@ -115,8 +119,9 @@ export class DIContainer {
     const tacticalCalculationService = new TacticalCalculationService();
     const gameNarrativeService = new GameNarrativeService(diceRollingService);
     
-    // ✅ NOUVEAU SYSTÈME AI SIMPLIFIÉ
-    const simpleAIService = new SimpleAIService(diceRollingService, logger);
+    // ✅ NOUVEAU SYSTÈME AI SIMPLIFIÉ avec résolution d'armes
+    const weaponResolutionService = new WeaponResolutionService(weaponRepository);
+    const simpleAIService = new SimpleAIService(diceRollingService, weaponResolutionService, logger);
 
     // Services essentiels seulement
     this.register('DiceRollingService', diceRollingService);
@@ -125,12 +130,29 @@ export class DIContainer {
     this.register('InitiativeService', initiativeService);
     this.register('TacticalCalculationService', tacticalCalculationService);
     this.register('GameNarrativeService', gameNarrativeService);
+    this.register('WeaponResolutionService', weaponResolutionService);
     this.register('SimpleAIService', simpleAIService);
 
     logger.debug('DI_CONTAINER', 'Domain services initialized');
 
+    // ===== COMBAT DEPENDENCIES =====
+    const combatDependencies = {
+      diceRollingService,
+      damageCalculationService,
+      weaponResolutionService,
+      logger
+    };
+
     // ===== USE CASES SIMPLIFIÉS =====
-    const combatGameUseCase = new CombatGameUseCase(simpleAIService, logger);
+    const combatGameUseCase = new CombatGameUseCase(
+      simpleAIService, 
+      logger,
+      characterRepository,
+      enemyRepository,
+      sceneRepository,
+      gameSessionRepository,
+      combatDependencies
+    );
     const sceneUseCase = new SceneUseCase(sceneRepository);
     const gameUseCase = new GameUseCase(sceneUseCase, characterRepository);
 
@@ -148,6 +170,7 @@ export class DIContainer {
     return {
       diceRollingService: this.get<DiceRollingService>('DiceRollingService'),
       damageCalculationService: this.get<DamageCalculationService>('DamageCalculationService'),
+      weaponResolutionService: this.get<WeaponResolutionService>('WeaponResolutionService'),
       logger: logger
     };
   }
@@ -163,6 +186,7 @@ export const TOKENS = {
   WeaponRepository: 'WeaponRepository',
   SpellRepository: 'SpellRepository',
   CharacterRepository: 'CharacterRepository',
+  EnemyRepository: 'EnemyRepository',
   SceneRepository: 'SceneRepository',
   GameSessionRepository: 'GameSessionRepository',
 
@@ -173,6 +197,7 @@ export const TOKENS = {
   InitiativeService: 'InitiativeService',
   TacticalCalculationService: 'TacticalCalculationService',
   GameNarrativeService: 'GameNarrativeService',
+  WeaponResolutionService: 'WeaponResolutionService',
   SimpleAIService: 'SimpleAIService',
 
   // Use Cases Simplifiés

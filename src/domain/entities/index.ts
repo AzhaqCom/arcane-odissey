@@ -10,7 +10,7 @@ export { GameSession } from './GameSession';
 export type { GamePhase, Difficulty, GameTime, GameFlags, GameMetrics, SaveMetadata } from './GameSession';
 
 export { Character } from './Character';
-
+export { Enemy } from './Enemy';
 
 export { EffectsManager } from './Effects';
 export { Spell, SpellSlots } from './Spell';

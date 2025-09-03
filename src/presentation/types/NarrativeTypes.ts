@@ -11,7 +11,13 @@ export type MessageTypeView =
   | 'narrative'
   | 'item'
   | 'spell'
-  | 'system';
+  | 'system'
+  | 'movement'
+  | 'attack_success'
+  | 'attack_miss'
+  | 'critical_hit'
+  | 'turn_start'
+  | 'turn_end';
 
 /**
  * Message narratif pour l'affichage UI uniquement

@@ -3,7 +3,7 @@
  * Types purs du domaine, sans dépendances infrastructure
  */
 
-import type { AbilityScores, Position } from './core';
+import type { Stats, Position } from './core';
 
 /**
  * Structure d'inventaire pure (domaine)
@@ -28,7 +28,7 @@ export interface CharacterCreationProps {
   readonly xp: number;
   readonly classId: string;
   readonly raceId: string;
-  readonly baseStats: AbilityScores;
+  readonly baseStats: Stats;
   readonly inventory: InventorySpec;
   readonly knownSpellIds: readonly string[];
   readonly currentHP: number;

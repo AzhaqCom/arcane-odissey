@@ -64,6 +64,44 @@ export const GameLog: React.FC<GameLogProps> = ({
       'system': { 
         color: '#616161', 
         fontSize: '0.9em' 
+      },
+      'movement': {
+        color: '#4fc3f7',
+        backgroundColor: '#e1f5fe',
+        padding: '2px 4px',
+        borderRadius: '3px'
+      },
+      'attack_success': {
+        color: '#d32f2f',
+        backgroundColor: '#ffebee',
+        padding: '2px 4px',
+        borderRadius: '3px',
+        fontWeight: 'bold'
+      },
+      'attack_miss': {
+        color: '#9e9e9e',
+        backgroundColor: '#f5f5f5',
+        padding: '2px 4px',
+        borderRadius: '3px'
+      },
+      'critical_hit': {
+        color: '#ff1744',
+        backgroundColor: '#ffebee',
+        padding: '2px 4px',
+        borderRadius: '3px',
+        fontWeight: 'bold',
+        animation: 'pulse 0.5s'
+      },
+      'turn_start': {
+        color: '#1976d2',
+        backgroundColor: '#e3f2fd',
+        padding: '2px 4px',
+        borderRadius: '3px',
+        fontWeight: 'bold'
+      },
+      'turn_end': {
+        color: '#616161',
+        fontSize: '0.9em'
       }
     };
     
@@ -82,7 +120,13 @@ export const GameLog: React.FC<GameLogProps> = ({
       'narrative': '📖',
       'item': '🎒',
       'spell': '✨',
-      'system': '🔧'
+      'system': '🔧',
+      'movement': '🏃',
+      'attack_success': '🎯',
+      'attack_miss': '🚫',
+      'critical_hit': '💥',
+      'turn_start': '🎲',
+      'turn_end': '⏹️'
     };
     return iconMap[type] || '•';
   };

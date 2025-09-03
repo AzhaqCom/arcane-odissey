@@ -14,7 +14,7 @@ export interface GridPosition extends Position {
 }
 
 // === STATISTIQUES D&D 5E ===
-export interface AbilityScores {
+export interface Stats {
   readonly strength: number;
   readonly dexterity: number;
   readonly constitution: number;

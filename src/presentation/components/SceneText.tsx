@@ -38,19 +38,19 @@ export const SceneText: React.FC<SceneTextProps> = ({
 
 
   React.useEffect(() => {
-    logger.ui(`Rendering text scene: ${scene.id}`, {
-      type: scene.type,
-      hasChoices: sceneAnalysis.availableChoices.length > 0,
-      hasContextualSpells: sceneAnalysis.contextualSpells.length > 0
-    });
+    // logger.ui(`Rendering text scene: ${scene.id}`, {
+    //   type: scene.type,
+    //   hasChoices: sceneAnalysis.availableChoices.length > 0,
+    //   hasContextualSpells: sceneAnalysis.contextualSpells.length > 0
+    // });
   }, [scene.id]);
 
   const handleChoiceClick = (choice: any) => {
     setSelectedChoice(choice.id);
-    logger.ui(`Choice selected: ${choice.id}`, {
-      text: choice.text,
-      targetScene: choice.targetSceneId
-    });
+    // logger.ui(`Choice selected: ${choice.id}`, {
+    //   text: choice.text,
+    //   targetScene: choice.targetSceneId
+    // });
 
     // Délai pour l'animation
     setTimeout(() => {
@@ -60,7 +60,7 @@ export const SceneText: React.FC<SceneTextProps> = ({
   };
 
   const handleSpellCast = (spellId: string) => {
-    logger.ui(`Contextual spell cast: ${spellId}`);
+    // logger.ui(`Contextual spell cast: ${spellId}`);
     onSpellCast?.(spellId);
     setShowContextualSpells(false);
   };

@@ -70,6 +70,29 @@ export class CharacterRepository implements ICharacterRepository {
       .filter(s => s.type === 'companion');
     return companionSources.map(s => this.convertDataSourceToEntity(s));
    }
+
+  /**
+   * Obtenir le personnage joueur actuel
+   * Pour l'instant, retourne le premier personnage joueur trouvé
+   */
+  public async getCurrentCharacter(): Promise<Character | null> {
+    const playerCharacters = await this.getPlayerCharacters();
+    if (playerCharacters.length === 0) {
+      logger.warn('CHARACTER_REPO', 'No player characters found');
+      return null;
+    }
+    
+    // Pour l'instant, retourne le premier personnage
+    // TODO: Ajouter logique de sélection du personnage actuel
+    const currentCharacter = playerCharacters[0];
+    logger.info('CHARACTER_REPO', `Current character: ${currentCharacter.name}`, {
+      id: currentCharacter.id,
+      level: currentCharacter.level,
+      hp: `${currentCharacter.currentHP}/${currentCharacter.maxHP}`
+    });
+    
+    return currentCharacter;
+  }
   public async getEnemyDataSourceById(id: string): Promise<DomainEnemyDataSource | null> { 
     const infraTemplate = this.gameDataStore.getEnemyTemplate(id);
     if (!infraTemplate) return null;

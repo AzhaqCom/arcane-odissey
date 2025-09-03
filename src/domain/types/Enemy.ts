@@ -2,7 +2,7 @@
  * DOMAIN TYPES - Enemy
  * Types purs pour les ennemis, sans dépendance externe
  */
-import type { Position, AbilityScores } from './core';
+import type { Position, Stats } from './core';
 
 export interface DomainEnemyDataSource {
   readonly id: string;
@@ -23,11 +23,12 @@ export interface DomainEnemyTemplate {
   readonly id: string;
   readonly name: string;
   readonly level: number;
-  readonly baseAbilities: AbilityScores;
+  readonly baseAbilities: Stats;
   readonly maxHp: number;
   readonly armorClass: number;
   readonly speed: number;
   readonly challengeRating?: number;
+  readonly xpReward?: number;
   readonly proficiencyBonus?: number;
   readonly resistances?: readonly string[];
   readonly vulnerabilities?: readonly string[];
