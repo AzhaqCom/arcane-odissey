@@ -27,8 +27,10 @@ import { InitiativeService } from '../../domain/services/InitiativeService';
 import { TacticalCalculationService } from '../../domain/services/TacticalCalculationService';
 import { GameNarrativeService } from '../../domain/services/GameNarrativeService';
 // ActionPrioritizer et ThreatAssessment supprimés (incompatibles avec Phoenix)
-import { SimpleAIService } from '../../domain/services/SimpleAIService';
+import { TacticalAIService } from '../../domain/services/TacticalAIService';
 import { WeaponResolutionService } from '../../domain/services/WeaponResolutionService';
+import { PlayerWeaponService } from '../../domain/services/PlayerWeaponService';
+import { SceneConditionService } from '../../domain/services/SceneConditionService';
 import type { IRandomNumberGenerator } from '../../domain/services/DiceRollingService';
 // import { Combat } from '../../domain/entities/Combat'; // ✅ SUPPRIMÉ - Utilise CombatEngine maintenant
 
@@ -119,9 +121,11 @@ export class DIContainer {
     const tacticalCalculationService = new TacticalCalculationService();
     const gameNarrativeService = new GameNarrativeService(diceRollingService);
     
-    // ✅ NOUVEAU SYSTÈME AI SIMPLIFIÉ avec résolution d'armes
+    // ✅ SYSTÈME AI TACTIQUE UNIFIÉ avec résolution d'armes
     const weaponResolutionService = new WeaponResolutionService(weaponRepository);
-    const simpleAIService = new SimpleAIService(diceRollingService, weaponResolutionService, logger);
+    const playerWeaponService = new PlayerWeaponService(weaponRepository);
+    const sceneConditionService = new SceneConditionService(logger);
+    const tacticalAIService = new TacticalAIService(diceRollingService, weaponResolutionService, logger);
 
     // Services essentiels seulement
     this.register('DiceRollingService', diceRollingService);
@@ -131,7 +135,9 @@ export class DIContainer {
     this.register('TacticalCalculationService', tacticalCalculationService);
     this.register('GameNarrativeService', gameNarrativeService);
     this.register('WeaponResolutionService', weaponResolutionService);
-    this.register('SimpleAIService', simpleAIService);
+    this.register('PlayerWeaponService', playerWeaponService);
+    this.register('SceneConditionService', sceneConditionService);
+    this.register('TacticalAIService', tacticalAIService);
 
     logger.debug('DI_CONTAINER', 'Domain services initialized');
 
@@ -145,13 +151,15 @@ export class DIContainer {
 
     // ===== USE CASES SIMPLIFIÉS =====
     const combatGameUseCase = new CombatGameUseCase(
-      simpleAIService, 
+      tacticalAIService,
       logger,
       characterRepository,
       enemyRepository,
       sceneRepository,
       gameSessionRepository,
-      combatDependencies
+      combatDependencies,
+      playerWeaponService,
+      sceneConditionService
     );
     const sceneUseCase = new SceneUseCase(sceneRepository);
     const gameUseCase = new GameUseCase(sceneUseCase, characterRepository);

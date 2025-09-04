@@ -7,7 +7,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { CombatGridNew } from './CombatGridNew';
-import { CombatPanelNew } from './CombatPanelNew';
+import { PlayerActionPanel } from './PlayerActionPanel';
 import { GameLog } from './GameLog';
 import { useCombatGame } from '../hooks/useCombatGame';
 // ✅ ÉTAPE 2.7 - Supprimé import DIContainer direct (violation architecturale)
@@ -37,12 +37,36 @@ export const CombatScenePhoenix: React.FC<CombatScenePhoenixProps> = ({
   // État local pour le mode mouvement
   const [isMovementMode, setIsMovementMode] = useState(false);
   
+  // État local pour les choix post-combat
+  const [postCombatChoices, setPostCombatChoices] = useState<Array<{
+    id: string;
+    text: string;
+    targetSceneId: string;
+  }>>([]);
+  
   // ✅ ÉTAPE 2.7 - Auto-initialisation du combat depuis la scène
   useEffect(() => {
     if (!combat.combatState) {
       combat.initializeCombatFromScene('forest_ambush');
     }
   }, []);
+
+  // ✅ NOUVELLE FONCTIONNALITÉ - Charger choix post-combat quand combat terminé
+  useEffect(() => {
+    const loadPostCombatChoices = async () => {
+      if (combat.isEnded && (combat.combatState?.phase === 'victory' || combat.combatState?.phase === 'defeat')) {
+        try {
+          const choices = await combat.getPostCombatChoices();
+          setPostCombatChoices(choices);
+        } catch (error) {
+          console.error('Failed to load post-combat choices:', error);
+        }
+      }
+    };
+
+    loadPostCombatChoices();
+  }, [combat.isEnded, combat.combatState?.phase]);
+
   
   // ✅ FONCTIONNALITÉ 3 - Utilisation des narratifs du Domain via useCombatGame
 
@@ -63,7 +87,14 @@ export const CombatScenePhoenix: React.FC<CombatScenePhoenixProps> = ({
       combat.confirmAction(position);
     } else if (interactionType === 'target') {
       // Position.x contient l'ID de l'entité dans ce cas
-      combat.confirmAction(position.x as any);
+      const targetId = position.x as string;
+      
+      // ✅ PHASE 2 - Gestion spécifique pour attaques avec arme
+      if (combat.playerActionContext.state === 'AWAITING_WEAPON_TARGET') {
+        combat.executeWeaponAttack(targetId);
+      } else {
+        combat.confirmAction(targetId);
+      }
     }
   };
 
@@ -178,8 +209,18 @@ export const CombatScenePhoenix: React.FC<CombatScenePhoenixProps> = ({
             overflowY: 'auto',
             overflowX: 'hidden'
           }}>
-            <CombatPanelNew
-              combat={combat}
+            <PlayerActionPanel
+              isPlayerTurn={combat.isPlayerTurn}
+              playerWeapons={combat.getPlayerWeapons()}
+              onSelectWeapon={combat.selectWeaponAttack}
+              onSelectMovement={combat.selectMoveAction}
+              selectedWeapon={combat.playerActionContext.selectedWeapon}
+              currentEntityName={combat.currentEntity?.name}
+              combatPhase={combat.combatState?.phase}
+              postCombatChoices={postCombatChoices}
+              onPostCombatChoice={async (choiceId, targetSceneId) => {
+                await combat.executePostCombatChoice(choiceId, targetSceneId);
+              }}
             />
           </div>
 

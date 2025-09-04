@@ -8,6 +8,8 @@ import { GameSession, Scene } from '../../domain/entities';
 import type { NarrativeMessage } from '../../domain/entities/NarrativeMessage';
 import type { GameUseCase, GameStateSnapshot } from './GameUseCase';
 import type { SceneUseCase, SceneAnalysis } from './SceneUseCase';
+import type { SceneConditionService, SceneChoice } from '../../domain/services/SceneConditionService';
+import type { CombatPhase } from '../../domain/entities/CombatEngine';
 import { logger } from '../../infrastructure/services/Logger';
 import { DIContainer } from '../../infrastructure/container/DIContainer';
 
@@ -39,6 +41,7 @@ interface DefaultGameConfiguration {
 export class GameSessionUseCase {
   private readonly gameUseCase: GameUseCase;
   private readonly sceneUseCase: SceneUseCase;
+  private readonly sceneConditionService: SceneConditionService;
   
   // Configuration par défaut (logique métier centralisée)
   private readonly DEFAULT_CONFIG: DefaultGameConfiguration = {
@@ -49,10 +52,12 @@ export class GameSessionUseCase {
 
   constructor(
     gameUseCase: GameUseCase,
-    sceneUseCase: SceneUseCase
+    sceneUseCase: SceneUseCase,
+    sceneConditionService: SceneConditionService
   ) {
     this.gameUseCase = gameUseCase;
     this.sceneUseCase = sceneUseCase;
+    this.sceneConditionService = sceneConditionService;
     this.gameNarrativeService = DIContainer.getInstance().get('GameNarrativeService');
   }
 
@@ -360,5 +365,17 @@ export class GameSessionUseCase {
       error: null,
       narrativeMessages: []
     };
+  }
+
+  /**
+   * NOUVELLE MÉTHODE - Vérifier transition post-combat (pattern 3 lignes max)
+   * Respecte ARCHITECTURE_GUIDELINES.md - Règle #2 Pattern 3 lignes
+   */
+  getPostCombatChoices(scene: Scene, combatPhase: CombatPhase): SceneChoice[] {
+    // LIGNE 1: Appel Domain pour filtrer choix selon condition combat
+    const availableChoices = this.sceneConditionService.getAvailableChoices(scene.choices, { combatPhase });
+    // LIGNE 2: Pas de sauvegarde (lecture seule)
+    // LIGNE 3: Retour
+    return availableChoices;
   }
 }

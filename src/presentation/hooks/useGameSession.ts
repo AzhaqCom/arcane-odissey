@@ -8,6 +8,7 @@ import React from 'react';
 import { GameSessionUseCase, type GameSessionState } from '../../application/usecases/GameSessionUseCase';
 import type { NarrativeMessage } from '../../domain/entities/NarrativeMessage';
 import { useRepositories } from './useRepositories';
+import { DIContainer } from '../../infrastructure/container/DIContainer';
 import { logger } from '../../infrastructure/services/Logger';
 
 /**
@@ -41,10 +42,10 @@ export const useGameSession = (): UseGameSessionReturn => {
   });
 
   // Créer le use case (memoized pour éviter les re-créations)
-  const gameSessionUseCase = React.useMemo(
-    () => new GameSessionUseCase(gameUseCase, sceneUseCase),
-    [gameUseCase, sceneUseCase]
-  );
+  const gameSessionUseCase = React.useMemo(() => {
+    const sceneConditionService = DIContainer.getInstance().get('SceneConditionService');
+    return new GameSessionUseCase(gameUseCase, sceneUseCase, sceneConditionService);
+  }, [gameUseCase, sceneUseCase]);
 
   // ✅ OPTIMISATION: Fonction d'initialisation memoized
   const initializeSession = React.useCallback(async () => {

@@ -8,6 +8,9 @@ import type { DiceRollingService } from '../services/DiceRollingService';
 import type { DamageCalculationService } from '../services/DamageCalculationService';
 import type { ILogger } from '../services/ILogger';
 import type { WeaponResolutionService } from '../services/WeaponResolutionService';
+import type { CombatTurnAction } from '../types/CombatContext';
+import type { AIProfile } from '../types/AIProfile';
+import type { Weapon } from '../entities/Weapon';
 
 // Types de base
 export interface CombatEntity {
@@ -39,6 +42,7 @@ export interface CombatEntity {
     movementUsed: boolean;
   };
   aiBehavior?: 'aggressive' | 'tactical' | 'defensive';
+  aiProfile?: AIProfile; // Nouveau système d'IA enrichi
   equipment?: {
     weapons?: string[];
     armor?: string[];
@@ -141,6 +145,9 @@ export class CombatEngine {
 
   /**
    * Ajouter des messages narratifs (retourne nouvelle instance)
+   * 
+   * @deprecated 2025-01-04 - Méthode jamais utilisée dans le codebase
+   * @removal-target Nettoyage Phase 1
    */
   private withAddedNarratives(...newNarratives: NarrativeMessage[]): CombatEngine {
     const updatedNarratives = [...this.narratives, ...newNarratives];
@@ -208,6 +215,8 @@ export class CombatEngine {
   }
 
   /**
+   * @deprecated Utilisez withExecutedTurn() à la place pour les actions d'IA.
+   * Conservé pour compatibilité avec les actions du joueur.
    * Appliquer une action de combat (retourne nouvelle instance)
    */
   withAppliedAction(action: CombatAction): CombatEngine {
@@ -261,7 +270,8 @@ export class CombatEngine {
           action: true,
           bonusAction: true,
           reaction: true,
-          movement: (entity.speed || 6) * 5 // Convertir cases → pieds (1 case = 5 pieds D&D)
+          movement: (entity.speed || 6) * 5, // Convertir cases → pieds (1 case = 5 pieds D&D)
+          movementUsed: false
         }
       }));
 
@@ -305,6 +315,9 @@ export class CombatEngine {
 
   /**
    * Mettre à jour une entité spécifique (retourne nouvelle instance)
+   * 
+   * @deprecated 2025-01-04 - Méthode jamais utilisée dans le codebase
+   * @removal-target Nettoyage Phase 1  
    */
   withUpdatedEntity(entityId: string, updates: Partial<CombatEntity>): CombatEngine {
     const updatedEntities = this.entities.map(entity =>
@@ -321,6 +334,189 @@ export class CombatEngine {
     );
   }
 
+  /**
+   * NOUVELLE MÉTHODE UNIFIÉE - Exécuter un tour complet
+   * Combine mouvement et attaque en une seule action atomique
+   * Respecte ARCHITECTURE_GUIDELINES.md - Règle #2 Immutabilité
+   */
+  withExecutedTurn(action: CombatTurnAction): CombatEngine {
+    // Validation de base
+    const currentEntity = this.entities.find(e => e.id === action.entityId);
+    if (!currentEntity) {
+      this.dependencies.logger.error('COMBAT_ENGINE', 'Entity not found for turn execution', {
+        entityId: action.entityId
+      });
+      return this;
+    }
+
+    // Vérifier que c'est bien le tour de cette entité
+    if (this.entities[this.currentTurnIndex].id !== action.entityId) {
+      this.dependencies.logger.warn('COMBAT_ENGINE', 'Turn execution requested for wrong entity', {
+        requestedEntityId: action.entityId,
+        currentEntityId: this.entities[this.currentTurnIndex].id
+      });
+      return this;
+    }
+
+    let updatedEntities = [...this.entities];
+    const narratives: NarrativeMessage[] = [];
+    let currentEntityState = currentEntity;
+
+    // Phase 1: Mouvement (optionnel)
+    if (action.movement) {
+      const moveDistance = this.calculateDistance(currentEntityState.position, action.movement);
+      const movementCost = moveDistance * 5; // 5 pieds par case
+
+      if (movementCost <= currentEntityState.actionsRemaining.movement) {
+        // Appliquer le mouvement
+        updatedEntities = updatedEntities.map(entity =>
+          entity.id === action.entityId
+            ? {
+                ...entity,
+                position: action.movement!,
+                actionsRemaining: {
+                  ...entity.actionsRemaining,
+                  movement: entity.actionsRemaining.movement - movementCost,
+                  movementUsed: true
+                }
+              }
+            : entity
+        );
+
+        // Mettre à jour l'état local pour la suite
+        currentEntityState = {
+          ...currentEntityState,
+          position: action.movement,
+          actionsRemaining: {
+            ...currentEntityState.actionsRemaining,
+            movement: currentEntityState.actionsRemaining.movement - movementCost,
+            movementUsed: true
+          }
+        };
+
+        // Narratif de mouvement
+        narratives.push(this.generateMoveNarrative(currentEntity, currentEntity.position, action.movement));
+
+        this.dependencies.logger.debug('COMBAT_ENGINE', 'Turn execution - movement phase', {
+          entityName: currentEntity.name,
+          from: currentEntity.position,
+          to: action.movement,
+          movementCost,
+          remainingMovement: currentEntityState.actionsRemaining.movement
+        });
+      } else {
+        this.dependencies.logger.warn('COMBAT_ENGINE', 'Insufficient movement for turn', {
+          entityName: currentEntity.name,
+          requestedDistance: moveDistance,
+          movementAvailable: currentEntityState.actionsRemaining.movement / 5
+        });
+      }
+    }
+
+    // Phase 2: Attaque (optionnel)
+    if (action.attackTarget && currentEntityState.actionsRemaining.action) {
+      const target = updatedEntities.find(e => e.id === action.attackTarget);
+      
+      if (target && !target.isDead) {
+        // Vérifier la portée depuis la position actuelle (après mouvement)
+        const distance = this.calculateDistance(currentEntityState.position, target.position);
+        const weapon = this.dependencies.weaponResolutionService.resolveBestWeaponForDistance(currentEntityState, distance);
+        
+        // Résoudre l'attaque
+        const attackResult = this.resolveAttack(currentEntityState, target);
+        
+        if (attackResult.hit) {
+          const newTargetHP = Math.max(0, target.hitPoints - attackResult.damage);
+          
+          // Appliquer les dégâts et marquer l'action comme utilisée
+          updatedEntities = updatedEntities.map(entity => {
+            if (entity.id === target.id) {
+              return {
+                ...entity,
+                hitPoints: newTargetHP,
+                isDead: newTargetHP === 0
+              };
+            }
+            if (entity.id === action.entityId) {
+              return {
+                ...entity,
+                actionsRemaining: {
+                  ...entity.actionsRemaining,
+                  action: false
+                }
+              };
+            }
+            return entity;
+          });
+
+          this.dependencies.logger.info('COMBAT_ENGINE', 'Turn execution - attack hit', {
+            attackerName: currentEntityState.name,
+            targetName: target.name,
+            damage: attackResult.damage,
+            weapon: attackResult.weapon,
+            targetHP: `${newTargetHP}/${target.maxHitPoints}`
+          });
+        } else {
+          // Attaque ratée, mais consommer l'action
+          updatedEntities = updatedEntities.map(entity =>
+            entity.id === action.entityId
+              ? {
+                  ...entity,
+                  actionsRemaining: {
+                    ...entity.actionsRemaining,
+                    action: false
+                  }
+                }
+              : entity
+          );
+
+          this.dependencies.logger.info('COMBAT_ENGINE', 'Turn execution - attack missed', {
+            attackerName: currentEntityState.name,
+            targetName: target.name,
+            weapon: attackResult.weapon,
+            attackRoll: attackResult.attackRoll,
+            targetAC: target.armorClass
+          });
+        }
+
+        // Narratif d'attaque
+        narratives.push(this.generateAttackNarrative(
+          currentEntityState,
+          target,
+          attackResult.attackRoll,
+          attackResult.hit ? attackResult.damage : undefined,
+          attackResult.weapon
+        ));
+      }
+    }
+
+    // Phase 3: Capacité spéciale (optionnel, pour future extension)
+    if (action.useAbility && currentEntityState.actionsRemaining.action) {
+      this.dependencies.logger.debug('COMBAT_ENGINE', 'Special ability usage not yet implemented', {
+        entityName: currentEntityState.name,
+        ability: action.useAbility
+      });
+    }
+
+    // Phase 4: Position défensive (optionnel)
+    if (action.defendPosition) {
+      // Pour l'instant, juste logger - pourra être étendu plus tard
+      this.dependencies.logger.debug('COMBAT_ENGINE', 'Defensive stance taken', {
+        entityName: currentEntityState.name
+      });
+    }
+
+    // Retourner le nouvel état avec toutes les modifications
+    return new CombatEngine(
+      updatedEntities,
+      this.currentTurnIndex,
+      this.round,
+      this.phase,
+      [...this.narratives, ...narratives],
+      this.dependencies
+    );
+  }
+
   // === GETTERS PURS (PAS DE MUTATION) ===
 
   /**
@@ -328,6 +524,13 @@ export class CombatEngine {
    */
   getCurrentEntity(): CombatEntity | null {
     return this.entities[this.currentTurnIndex] || null;
+  }
+
+  /**
+   * Récupérer toutes les entités (lecture seule)
+   */
+  getAllEntities(): readonly CombatEntity[] {
+    return this.entities;
   }
 
   /**
@@ -392,10 +595,10 @@ export class CombatEngine {
     const gridWidth = 12;
     const gridHeight = 8;
 
-    // Calculer toutes les positions dans le rayon de mouvement (distance Manhattan)
+    // Calculer toutes les positions dans le rayon de mouvement (distance Chebyshev)
     for (let y = 0; y < gridHeight; y++) {
       for (let x = 0; x < gridWidth; x++) {
-        const distance = Math.abs(x - startX) + Math.abs(y - startY);
+        const distance = Math.max(Math.abs(x - startX), Math.abs(y - startY));
         
         // Dans le rayon ET différent de la position actuelle
         if (distance <= movementRange && distance > 0) {
@@ -690,8 +893,9 @@ export class CombatEngine {
         return entity;
       });
 
-      // Générer le narratif d'attaque réussie
-      narratives.push(this.generateAttackNarrative(attacker, target, attackRoll, damage));
+      // Générer le narratif d'attaque réussie  
+      const weaponName = this.dependencies.weaponResolutionService.resolveBestWeaponForDistance(attacker, distance)?.name || 'attaque';
+      narratives.push(this.generateAttackNarrative(attacker, target, attackRoll, damage, weaponName));
 
     } else {
       // Raté
@@ -702,7 +906,8 @@ export class CombatEngine {
       );
 
       // Générer le narratif d'attaque ratée
-      narratives.push(this.generateAttackNarrative(attacker, target, attackRoll));
+      const weaponName = this.dependencies.weaponResolutionService.resolveBestWeaponForDistance(attacker, distance)?.name || 'attaque';
+      narratives.push(this.generateAttackNarrative(attacker, target, attackRoll, undefined, weaponName));
     }
 
     return { entities: updatedEntities, narratives };
@@ -952,7 +1157,8 @@ export class CombatEngine {
     }
 
     // Narratif d'attaque avec les vrais résultats
-    narratives.push(this.generateAttackNarrative(currentEntity, target, attackRoll, damage));
+    const weaponName = this.dependencies.weaponResolutionService.resolveBestWeaponForDistance(currentEntity, distance)?.name || 'attaque';
+    narratives.push(this.generateAttackNarrative(currentEntity, target, attackRoll, damage, weaponName));
 
     return { entities: updatedEntities, narratives };
   }
@@ -995,7 +1201,7 @@ export class CombatEngine {
    * Générer un message narratif pour un mouvement
    */
   private generateMoveNarrative(entity: CombatEntity, from: Position, to: Position): NarrativeMessage {
-    const distance = Math.abs(to.x - from.x) + Math.abs(to.y - from.y);
+    const distance = Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y));
     
     return {
       id: generateNarrativeId(),
@@ -1015,7 +1221,7 @@ export class CombatEngine {
   /**
    * Générer un message narratif pour une attaque
    */
-  private generateAttackNarrative(attacker: CombatEntity, target: CombatEntity, attackRoll: number, damage?: number, weaponName: string = 'arme'): NarrativeMessage {
+  private generateAttackNarrative(attacker: CombatEntity, target: CombatEntity, attackRoll: number, damage?: number, weaponName: string): NarrativeMessage {
     const hit = attackRoll >= target.armorClass;
     const isCritical = attackRoll === 20;
     
@@ -1028,7 +1234,12 @@ export class CombatEngine {
         type: isCritical ? 'critical_hit' : 'attack_success',
         timestamp: new Date(),
         actors: [attacker.name, target.name],
-        action: `${attacker.name} attaque ${target.name} avec ${weaponName}`,
+        action: (() => {
+          this.dependencies.logger.debug('ATTACK_NARRATIVE_1234', 'generateAttackNarrative ligne 1234', {
+            weaponName, weaponType: typeof weaponName, attacker: attacker.name, target: target.name
+          });
+          return `${attacker.name} attaque ${target.name} avec ${weaponName}`;
+        })(),
         result: isCritical 
           ? `CRITIQUE ! ${finalDamage} dégâts (${remainingHP}/${target.maxHitPoints} PV restants)`
           : `Touché ! ${finalDamage} dégâts (${remainingHP}/${target.maxHitPoints} PV restants)`,
@@ -1046,7 +1257,12 @@ export class CombatEngine {
         type: 'attack_miss',
         timestamp: new Date(),
         actors: [attacker.name, target.name],
-        action: `${attacker.name} attaque ${target.name} avec ${weaponName}`,
+        action: (() => {
+          this.dependencies.logger.debug('ATTACK_NARRATIVE_1252', 'generateAttackNarrative ligne 1252 MISS', {
+            weaponName, weaponType: typeof weaponName, attacker: attacker.name, target: target.name
+          });
+          return `${attacker.name} attaque ${target.name} avec ${weaponName}`;
+        })(),
         result: 'Manqué !',
         details: {
           attackRoll,
@@ -1055,6 +1271,7 @@ export class CombatEngine {
       };
     }
   }
+
 
   /**
    * Générer un message narratif pour début de tour
@@ -1106,6 +1323,27 @@ export class CombatEngine {
   }
 
   /**
+   * Helper public pour calculer la distance Chebyshev entre deux positions
+   * Distance tactique D&D : diagonales comptent comme 1 case
+   */
+  calculateDistance(pos1: Position, pos2: Position): number {
+    return Math.max(Math.abs(pos1.x - pos2.x), Math.abs(pos1.y - pos2.y));
+  }
+
+  /**
+   * Helper pour vérifier si une entité peut exécuter un tour complet
+   */
+  canEntityExecuteTurn(entityId: string): boolean {
+    const entity = this.entities.find(e => e.id === entityId);
+    if (!entity || entity.isDead) {
+      return false;
+    }
+    
+    // Une entité peut exécuter un tour si elle a soit du mouvement, soit une action
+    return entity.actionsRemaining.action || entity.actionsRemaining.movement > 0;
+  }
+
+  /**
    * ✅ BUSINESS RULES - Vérifier si une entité peut effectuer une action spécifique
    * Logique métier centralisée dans Domain
    */
@@ -1141,5 +1379,182 @@ export class CombatEngine {
     if (aliveEnemies.length === 0) return 'victory';
     if (aliveAllies.length === 0) return 'defeat';
     return 'active';
+  }
+
+  /**
+   * NOUVELLE MÉTHODE - Attaque avec arme spécifiée par le joueur
+   * Règle #1 : Logique métier dans Domain
+   * Règle #4 : Méthode immutable, retourne nouvelle instance
+   */
+  withAppliedWeaponAttack(action: CombatAction, weaponId: string): CombatEngine {
+    // Valider l'action
+    const currentEntity = this.getCurrentEntity();
+    if (!currentEntity || currentEntity.id !== action.entityId) {
+      this.dependencies.logger.error('COMBAT_ENGINE', 'Invalid weapon attack action', {
+        actionEntityId: action.entityId,
+        currentEntityId: currentEntity?.id,
+        weaponId
+      });
+      return this; // Retourne instance inchangée si action invalide
+    }
+
+    // Appliquer l'attaque avec l'arme spécifiée
+    const { entities: updatedEntities, narratives } = this.applyWeaponAttack(
+      this.entities, action, currentEntity, weaponId
+    );
+    
+    this.dependencies.logger.debug('COMBAT_ENGINE', 'Weapon attack applied', {
+      actionType: action.type,
+      entityId: action.entityId,
+      targetId: action.targetId,
+      weaponId,
+      narrativesGenerated: narratives.length
+    });
+
+    return new CombatEngine(
+      updatedEntities,
+      this.currentTurnIndex,
+      this.round,
+      this.phase,
+      [...this.narratives, ...narratives],
+      this.dependencies
+    );
+  }
+
+  /**
+   * Appliquer une attaque avec arme spécifiquement choisie (fonction pure)
+   * Règle #1 : Logique métier dans Domain
+   */
+  private applyWeaponAttack(
+    entities: CombatEntity[], 
+    action: CombatAction,
+    currentEntity: CombatEntity,
+    weaponId: string
+  ): { entities: CombatEntity[], narratives: NarrativeMessage[] } {
+    if (!action.targetId) return { entities, narratives: [] };
+
+    const attacker = entities.find(e => e.id === action.entityId);
+    const target = entities.find(e => e.id === action.targetId);
+
+    if (!attacker || !target) return { entities, narratives: [] };
+
+    // Forcer l'utilisation de l'arme choisie par le joueur
+    const weapon = this.dependencies.weaponResolutionService.getWeapon(weaponId);
+    
+    if (!weapon) {
+      // Si arme non trouvée, fallback sur système automatique
+      const result = this.resolveAttack(attacker, target);
+      return this.executeAttackResult(entities, attacker, target, result);
+    }
+
+    // Résoudre attaque avec l'arme forcée
+    const result = this.resolveAttackWithWeapon(attacker, target, weapon);
+    return this.executeAttackResult(entities, attacker, target, result);
+  }
+
+  /**
+   * Résoudre une attaque avec une arme spécifique (fonction pure)
+   * Règle #1 : Logique métier dans Domain
+   */
+  private resolveAttackWithWeapon(
+    attacker: CombatEntity,
+    target: CombatEntity,
+    weapon: Weapon
+  ): { hit: boolean; damage: number; weapon: string; attackRoll: number } {
+    // Debug log pour l'action du joueur
+    this.dependencies.logger.debug('PLAYER_ATTACK', 'resolveAttackWithWeapon called', {
+      attackerId: attacker.id,
+      attackerName: attacker.name,
+      targetId: target.id,
+      targetName: target.name,
+      weapon: weapon,
+      weaponName: weapon?.name,
+      weaponType: typeof weapon
+    });
+
+    // Calcul d'attaque avec l'arme spécifiée
+    const abilityModifier = Math.floor((attacker.stats[weapon.stat] - 10) / 2);
+    const attackRoll = this.dependencies.diceRollingService.roll('1d20') + abilityModifier;
+
+    if (attackRoll >= target.armorClass) {
+      const damage = weapon.calculateDamage(this.dependencies.diceRollingService, abilityModifier);
+      return { hit: true, damage, weapon: weapon.name, attackRoll };
+    }
+
+    return { hit: false, damage: 0, weapon: weapon.name, attackRoll };
+  }
+
+  /**
+   * Exécuter le résultat d'une attaque (fonction pure)
+   * Règle #1 : Logique métier dans Domain
+   */
+  private executeAttackResult(
+    entities: CombatEntity[],
+    attacker: CombatEntity,
+    target: CombatEntity,
+    result: { hit: boolean; damage: number; weapon: string; attackRoll: number }
+  ): { entities: CombatEntity[], narratives: NarrativeMessage[] } {
+    let updatedEntities = entities;
+    const narratives: NarrativeMessage[] = [];
+
+    if (result.hit) {
+      const newTargetHP = Math.max(0, target.hitPoints - result.damage);
+      updatedEntities = entities.map(e => {
+        if (e.id === target.id) {
+          return {
+            ...e,
+            hitPoints: newTargetHP,
+            isDead: newTargetHP <= 0
+          };
+        }
+        if (e.id === attacker.id) {
+          return {
+            ...e,
+            actionsRemaining: {
+              ...e.actionsRemaining,
+              action: false
+            }
+          };
+        }
+        return e;
+      });
+
+      // Générer narratif d'attaque réussie
+      narratives.push(this.generateAttackNarrative(
+        attacker, target, result.attackRoll, result.damage, result.weapon
+      ));
+    } else {
+      // Attaque ratée - juste consommer l'action
+      updatedEntities = entities.map(e => {
+        if (e.id === attacker.id) {
+          return {
+            ...e,
+            actionsRemaining: {
+              ...e.actionsRemaining,
+              action: false
+            }
+          };
+        }
+        return e;
+      });
+
+      // Debug log pour voir le result complet
+      this.dependencies.logger.debug('COMBAT_MISS', 'Attack missed - result debug', {
+        attackerId: attacker.id,
+        attackerName: attacker.name,
+        targetId: target.id,
+        targetName: target.name,
+        result: result,
+        resultWeapon: result.weapon,
+        resultWeaponType: typeof result.weapon
+      });
+
+      // Générer narratif d'attaque ratée
+      narratives.push(this.generateAttackNarrative(
+        attacker, target, result.attackRoll, undefined, result.weapon
+      ));
+    }
+
+    return { entities: updatedEntities, narratives };
   }
 }

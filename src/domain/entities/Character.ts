@@ -219,8 +219,45 @@ export class Character {
         action: true,
         bonusAction: true,
         reaction: true,
-        movement: this.speed * 5 // Convertir cases → pieds D&D (1 case = 5 pieds)
+        movement: this.speed * 5, // Convertir cases → pieds D&D (1 case = 5 pieds)
+        movementUsed: false
+      },
+      equipment: {
+        weapons: this.getEquippedWeapons(),
+        armor: this.getEquippedArmor()
       }
     };
+  }
+
+  /**
+   * Récupère les armes équipées depuis inventory.equipped
+   * Règle #1 : Logique métier dans Domain
+   */
+  private getEquippedWeapons(): string[] {
+    const weapons: string[] = [];
+    
+    // Arme de mêlée (mainHand: 'dagger')
+    if (this.inventory?.equipped?.mainHand) {
+      weapons.push(this.inventory.equipped.mainHand);
+    }
+    
+    // Arme à distance (rangedWeapon: 'shortbow') 
+    if (this.inventory?.equipped?.rangedWeapon) {
+      weapons.push(this.inventory.equipped.rangedWeapon);
+    }
+    
+    return weapons; // ['dagger', 'shortbow'] pour Elarion
+  }
+
+  /**
+   * Récupère les armures équipées
+   * Règle #1 : Logique métier dans Domain
+   */
+  private getEquippedArmor(): string[] {
+    const armor: string[] = [];
+    if (this.inventory?.equipped?.armor) {
+      armor.push(this.inventory.equipped.armor);
+    }
+    return armor;
   }
 }

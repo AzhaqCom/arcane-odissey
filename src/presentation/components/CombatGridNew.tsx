@@ -95,7 +95,9 @@ export const CombatGridNew: React.FC<CombatGridNewProps> = ({
   const targetableCells = useMemo(() => {
     const cells = new Set<string>();
     
-    if ((playerActionContext.state === 'AWAITING_ATTACK_TARGET' || playerActionContext.state === 'AWAITING_SPELL_TARGET') 
+    if ((playerActionContext.state === 'AWAITING_ATTACK_TARGET' || 
+         playerActionContext.state === 'AWAITING_WEAPON_TARGET' || 
+         playerActionContext.state === 'AWAITING_SPELL_TARGET') 
         && playerActionContext.validTargets) {
       
       // Marquer les positions des cibles valides
@@ -247,7 +249,9 @@ export const CombatGridNew: React.FC<CombatGridNewProps> = ({
     }
     
     // Mode ciblage
-    if ((playerActionContext.state === 'AWAITING_ATTACK_TARGET' || playerActionContext.state === 'AWAITING_SPELL_TARGET') && targetableCells.has(key)) {
+    if ((playerActionContext.state === 'AWAITING_ATTACK_TARGET' || 
+         playerActionContext.state === 'AWAITING_WEAPON_TARGET' || 
+         playerActionContext.state === 'AWAITING_SPELL_TARGET') && targetableCells.has(key)) {
       const targetEntity = entitiesByPosition.get(key);
       if (targetEntity) {
         // Utiliser l'ID de l'entité comme position pour le callback

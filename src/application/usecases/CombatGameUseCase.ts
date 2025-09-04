@@ -11,14 +11,18 @@ import type {
   CombatState, 
   CombatDependencies 
 } from '../../domain/entities/CombatEngine';
-import type { SimpleAIService } from '../../domain/services/SimpleAIService';
+import type { TacticalAIService } from '../../domain/services/TacticalAIService';
 import type { ILogger } from '../../domain/services/ILogger';
+import type { CombatTurnAction } from '../../domain/types/CombatContext';
 import { CombatFactory } from '../../domain/factories/CombatFactory';
 import type { CombatInitializationData, CombatSceneConfig } from '../../domain/types/CombatConfiguration';
 import type { ICharacterRepository } from '../../domain/repositories/ICharacterRepository';
 import type { IEnemyRepository } from '../../domain/repositories/IEnemyRepository';
 import type { ISceneRepository } from '../../domain/repositories/ISceneRepository';
 import type { IGameSessionRepository } from '../../domain/repositories/IGameSessionRepository';
+import { CombatActionMapper } from '../mappers/CombatActionMapper';
+import { PlayerWeaponService, type PlayerWeaponChoice } from '../../domain/services/PlayerWeaponService';
+import type { SceneConditionService, SceneChoice } from '../../domain/services/SceneConditionService';
 
 /**
  * USE CASE DE COMBAT
@@ -28,30 +32,36 @@ import type { IGameSessionRepository } from '../../domain/repositories/IGameSess
  * ✅ Couche fine entre domain et présentation
  */
 export class CombatGameUseCase {
-  private aiService: SimpleAIService;
+  private tacticalAIService: TacticalAIService;
   private logger: ILogger;
   private characterRepository: ICharacterRepository;
   private enemyRepository: IEnemyRepository;
   private sceneRepository: ISceneRepository;
   private gameSessionRepository: IGameSessionRepository;
   private combatDependencies: CombatDependencies;
+  private playerWeaponService: PlayerWeaponService;
+  private sceneConditionService: SceneConditionService;
 
   constructor(
-    aiService: SimpleAIService, 
+    tacticalAIService: TacticalAIService,
     logger: ILogger,
     characterRepository: ICharacterRepository,
     enemyRepository: IEnemyRepository,
     sceneRepository: ISceneRepository,
     gameSessionRepository: IGameSessionRepository,
-    combatDependencies: CombatDependencies
+    combatDependencies: CombatDependencies,
+    playerWeaponService: PlayerWeaponService,
+    sceneConditionService: SceneConditionService
   ) {
-    this.aiService = aiService;
+    this.tacticalAIService = tacticalAIService;
     this.logger = logger;
     this.characterRepository = characterRepository;
     this.enemyRepository = enemyRepository;
     this.sceneRepository = sceneRepository;
     this.gameSessionRepository = gameSessionRepository;
     this.combatDependencies = combatDependencies;
+    this.playerWeaponService = playerWeaponService;
+    this.sceneConditionService = sceneConditionService;
   }
 
   /**
@@ -150,42 +160,23 @@ export class CombatGameUseCase {
 
   /**
    * ✅ PATTERN SAUVEGARDE OBLIGATOIRE - Traiter un tour d'AI
-   * Calcule l'action AI, applique, sauvegarde, puis retourne le nouvel état
+   * Orchestre le calcul et l'application d'action AI
+   * Respecte ARCHITECTURE_GUIDELINES.md - Règle #2 Pattern 3 lignes
    */
   async processAITurn(combat: CombatEngine): Promise<CombatEngine> {
     const currentEntity = combat.getCurrentEntity();
     
-    if (!currentEntity) {
-      this.logger.error('COMBAT_GAME_USECASE', 'No current entity for AI turn');
+    if (!currentEntity || currentEntity.type === 'player') {
+      this.logger.warn('COMBAT_GAME_USECASE', 'Invalid entity for AI turn', {
+        hasEntity: !!currentEntity,
+        entityType: currentEntity?.type
+      });
       return combat;
     }
 
-    if (currentEntity.type === 'player') {
-      this.logger.warn('COMBAT_GAME_USECASE', 'AI turn requested on player turn', {
-        entityName: currentEntity.name
-      });
-      return combat; // Pas d'action, c'est au joueur
-    }
-
-    this.logger.debug('COMBAT_GAME_USECASE', 'Processing AI turn', {
-      entityName: currentEntity.name,
-      entityType: currentEntity.type,
-      behavior: currentEntity.aiBehavior,
-      hitPoints: `${currentEntity.hitPoints}/${currentEntity.maxHitPoints}`
-    });
-
-    // Calculer l'action AI (fonction pure)
-    const aiAction = this.aiService.calculateAIAction(currentEntity, combat.getState());
-
-    this.logger.info('COMBAT_GAME_USECASE', 'AI action calculated', {
-      entityName: currentEntity.name,
-      actionType: aiAction.type,
-      targetId: aiAction.targetId,
-      position: aiAction.position
-    });
-
-    // ✅ LIGNE 1: Appliquer action AI Domain
-    let updatedCombat = combat.withAppliedAction(aiAction);
+    // ✅ LIGNE 1: Calculer action via Domain
+    const aiAction = this.determineAIAction(currentEntity, combat.getState());
+    let updatedCombat = combat.withExecutedTurn(aiAction);
     updatedCombat = updatedCombat.withAdvancedTurn();
 
     // ✅ LIGNE 2: Sauvegarde obligatoire
@@ -194,6 +185,66 @@ export class CombatGameUseCase {
     // ✅ LIGNE 3: Retourner nouvel état
     return updatedCombat;
   }
+
+  /**
+   * HELPER - Calcul de l'action IA via TacticalAIService
+   * Délégation pure sans logique métier
+   */
+  private determineAIAction(entity: CombatEntity, combatState: CombatState): CombatTurnAction {
+    // ✅ Système d'IA tactique unifié - tous les ennemis ont maintenant un aiProfile
+    if (!entity.aiProfile) {
+      this.logger.error('COMBAT_GAME_USECASE', 'Entity missing aiProfile - this should not happen', {
+        entityId: entity.id,
+        entityName: entity.name
+      });
+      // Action par défaut si pas de profil (ne devrait jamais arriver)
+      return {
+        type: 'execute_turn',
+        entityId: entity.id
+      };
+    }
+    
+    return this.tacticalAIService.calculateOptimalTurn(entity, combatState, entity.aiProfile);
+  }
+
+
+
+  /**
+   * ✅ PATTERN SAUVEGARDE OBLIGATOIRE - Traiter action joueur avec système unifié
+   * Orchestre la conversion et l'application d'action joueur
+   * Respecte ARCHITECTURE_GUIDELINES.md - Règle #2 Pattern 3 lignes
+   */
+  async processPlayerActionUnified(combat: CombatEngine, action: CombatAction): Promise<CombatEngine> {
+    const currentEntity = combat.getCurrentEntity();
+    
+    if (!currentEntity || currentEntity.type !== 'player') {
+      this.logger.error('COMBAT_GAME_USECASE', 'Invalid entity for player action');
+      return combat;
+    }
+
+    // Gérer end_turn avec ancien système
+    if (action.type === 'end_turn') {
+      return this.processPlayerAction(combat, action);
+    }
+
+    // ✅ LIGNE 1: Convertir et appliquer via Domain
+    const unifiedAction = CombatActionMapper.convertLegacyToUnified(action);
+    if (!unifiedAction) {
+      return this.processPlayerAction(combat, action); // Fallback
+    }
+
+    let updatedCombat = combat.withExecutedTurn(unifiedAction);
+    if (!currentEntity.actionsRemaining.action) {
+      updatedCombat = updatedCombat.withAdvancedTurn();
+    }
+
+    // ✅ LIGNE 2: Sauvegarde obligatoire
+    await this.saveCombatState(updatedCombat);
+    
+    // ✅ LIGNE 3: Retourner nouvel état
+    return updatedCombat;
+  }
+
 
   /**
    * Obtenir l'état actuel du combat
@@ -279,6 +330,71 @@ export class CombatGameUseCase {
   }
 
   /**
+   * NOUVELLES MÉTHODES - SYSTÈME D'ARMES JOUEUR
+   * Respecte ARCHITECTURE_GUIDELINES.md - Règle #2 Pattern 3 lignes
+   */
+
+  /**
+   * Récupérer les armes du joueur pour l'UI
+   * Règle #2: Pattern 3 lignes - Appel/Pas de save/Retour
+   */
+  getPlayerWeaponChoices(combat: CombatEngine): PlayerWeaponChoice[] {
+    const currentEntity = combat.getCurrentEntity();
+    if (!currentEntity || currentEntity.type !== 'player') return [];
+    
+    // LIGNE 1: Appel au Domain
+    const choices = this.playerWeaponService.getAvailableWeaponsForPlayer(currentEntity);
+    
+    // LIGNE 2: Pas de sauvegarde (lecture seule)
+    // LIGNE 3: Retour
+    return choices;
+  }
+  
+  /**
+   * Récupérer les cibles valides pour une arme du joueur
+   * Règle #2: Pattern 3 lignes - Appel/Pas de save/Retour
+   */
+  getValidTargetsForPlayerWeapon(combat: CombatEngine, weaponId: string): CombatEntity[] {
+    const currentEntity = combat.getCurrentEntity();
+    if (!currentEntity || currentEntity.type !== 'player') return [];
+    
+    // LIGNE 1: Appel au Domain  
+    const targets = this.playerWeaponService.getValidTargetsForWeapon(
+      currentEntity, weaponId, combat.getAllEntities()
+    );
+    
+    // LIGNE 2: Pas de sauvegarde (lecture seule)
+    // LIGNE 3: Retour
+    return targets;
+  }
+  
+  /**
+   * Exécuter attaque avec arme choisie par le joueur
+   * Règle #2: Pattern 3 lignes - Appel/Save/Retour
+   */
+  async executePlayerWeaponAttack(
+    combat: CombatEngine, 
+    weaponId: string, 
+    targetId: string
+  ): Promise<CombatEngine> {
+    // LIGNE 1: Créer action spécifique à l'arme et appel Domain
+    const action: CombatAction = {
+      type: 'attack',
+      entityId: combat.getCurrentEntity()!.id,
+      targetId,
+      weaponId // NOUVEAU: Spécifier l'arme choisie
+    };
+    
+    const updatedCombat = combat.withAppliedWeaponAttack(action, weaponId);
+    
+    // LIGNE 2: Sauvegarde obligatoire
+    await this.saveCombatState(updatedCombat);
+    
+    // LIGNE 3: Retour avec avancement tour
+    return updatedCombat.withAdvancedTurn();
+  }
+
+  /**
    * ✅ FONCTIONNALITÉ 1.1 - Obtenir les cellules atteignables
    * Délégation pure vers Domain pour calcul tactique
    */
@@ -290,6 +406,55 @@ export class CombatGameUseCase {
 
     // Délégation pure vers Domain - pas de logique métier ici
     return combat.calculateReachableCells(currentEntity.id);
+  }
+
+  /**
+   * ✅ NOUVELLE MÉTHODE - Obtenir choix post-combat depuis la scène actuelle
+   * Respecte ARCHITECTURE_GUIDELINES.md - Règle #2 Pattern 3 lignes
+   */
+  async getPostCombatChoices(combat: CombatEngine): Promise<Array<{
+    id: string;
+    text: string;
+    targetSceneId: string;
+  }>> {
+    const combatPhase = combat.getState().phase;
+    if (combatPhase !== 'victory' && combatPhase !== 'defeat') return [];
+
+    // LIGNE 1: Récupérer scène depuis Repository
+    const currentSession = await this.gameSessionRepository.getCurrentSession();
+    if (!currentSession) return [];
+    
+    const scene = await this.sceneRepository.getById(currentSession.currentSceneId);
+    if (!scene || !scene.choices) return [];
+
+    // LIGNE 2: Filtrer choix via Domain Service
+    const availableChoices = this.sceneConditionService.getAvailableChoices(
+      scene.choices, 
+      { combatPhase }
+    );
+
+    // LIGNE 3: Retourner format UI
+    return availableChoices.map(choice => ({
+      id: choice.id,
+      text: choice.text,
+      targetSceneId: choice.targetSceneId
+    }));
+  }
+
+  /**
+   * ✅ NOUVELLE MÉTHODE - Exécuter choix post-combat
+   * Respecte ARCHITECTURE_GUIDELINES.md - Règle #2 Pattern 3 lignes
+   */
+  async executePostCombatChoice(choiceId: string, targetSceneId: string): Promise<boolean> {
+    // LIGNE 1: Déclencher transition via GameSession (Domain orchestration)
+    const currentSession = await this.gameSessionRepository.getCurrentSession();
+    if (!currentSession) return false;
+
+    // LIGNE 2: Sauvegarder nouvelle scène
+    const success = await this.gameSessionRepository.updateCurrentScene(currentSession.id, targetSceneId);
+
+    // LIGNE 3: Retourner résultat
+    return success;
   }
 
   /**

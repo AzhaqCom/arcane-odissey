@@ -60,10 +60,11 @@ export class TacticalGrid {
   }
 
   /**
-   * Calculer la distance Manhattan (pour terrain difficile)
+   * Calculer la distance Chebyshev (distance tactique D&D)
+   * Les diagonales comptent comme 1 case
    */
   calculateManhattanDistance(from: GridPosition, to: GridPosition): number {
-    return Math.abs(from.x - to.x) + Math.abs(from.y - to.y);
+    return Math.max(Math.abs(from.x - to.x), Math.abs(from.y - to.y));
   }
 
   /**

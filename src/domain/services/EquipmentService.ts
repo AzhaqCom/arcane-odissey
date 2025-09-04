@@ -2,6 +2,10 @@
  * DOMAIN - EquipmentService
  * Service de domaine pour la gestion de l'équipement des personnages
  * Responsabilité: Logique métier pure pour l'équipement et l'inventaire
+ * 
+ * @deprecated 2025-01-04 - Classe non utilisée dans le codebase
+ * @removal-target Nettoyage Phase 1
+ * @replaced-by PlayerWeaponService pour la gestion des armes
  */
 
 import type { Character } from '../entities/Character';

@@ -6,6 +6,7 @@
 import type { Stats, Position, DamageType } from '../types/core';
 import type { DomainEnemyTemplate } from '../types/Enemy';
 import type { CombatEntity } from './CombatEngine';
+import type { AIProfile } from '../types/AIProfile';
 
 /**
  * Classe Enemy immutable suivant le pattern de Character
@@ -37,12 +38,8 @@ export class Enemy {
     readonly armor?: readonly string[];
   };
 
-  // IA et comportement
-  public readonly aiProfile?: {
-    readonly behavior: 'aggressive' | 'defensive' | 'tactical' | 'cowardly';
-    readonly preferredRange: 'melee' | 'ranged' | 'mixed';
-    readonly aggroRadius?: number;
-  };
+  // IA et comportement - Nouveau système enrichi
+  public readonly aiProfile: AIProfile;
 
   /**
    * Constructeur qui crée un Enemy depuis un template
@@ -209,7 +206,7 @@ export class Enemy {
         movement: this.speed * 5, // Convertir cases → pieds D&D (1 case = 5 pieds)
         movementUsed: false
       },
-      aiBehavior: this.aiProfile?.behavior,
+      aiProfile: this.aiProfile, // ✅ Nouveau système AIProfile complet
       equipment: this.equipment
     };
   }

@@ -193,16 +193,16 @@ export class Logger {
     
     switch (log.level) {
       case 'debug':
-        console.log(prefix, log.message, log.data); 
+        console.log(prefix, log.message, ...(log.data ? [log.data] : [])); 
         break;
       case 'info':
-        console.info(prefix, log.message, log.data); 
+        console.info(prefix, log.message, ...(log.data ? [log.data] : [])); 
         break;
       case 'warn':
-        console.warn(prefix, log.message, log.data);
+        console.warn(prefix, log.message, ...(log.data ? [log.data] : []));
         break;
       case 'error':
-        console.error(prefix, log.message, log.data);
+        console.error(prefix, log.message, ...(log.data ? [log.data] : []));
         break;
     }
   }

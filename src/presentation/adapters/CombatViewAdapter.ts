@@ -245,8 +245,8 @@ export class CombatViewAdapter {
       return false;
     }
 
-    // Vérifier la distance (Manhattan distance pour D&D)
-    const distance = Math.abs(toPos.x - fromPos.x) + Math.abs(toPos.y - fromPos.y);
+    // Vérifier la distance (Chebyshev distance pour D&D)
+    const distance = Math.max(Math.abs(toPos.x - fromPos.x), Math.abs(toPos.y - fromPos.y));
     return distance <= movement;
   }
 }

@@ -15,6 +15,7 @@ import type {
 } from '../../domain/entities/CombatEngine';
 import type { CombatGameUseCase } from '../../application/usecases/CombatGameUseCase';
 import type { NarrativeMessageView, MessageTypeView } from '../types/NarrativeTypes';
+import type { PlayerWeaponChoice } from '../../domain/services/PlayerWeaponService';
 import { DIContainer } from '../../infrastructure/container/DIContainer';
 
 /**
@@ -59,6 +60,7 @@ export type PlayerActionState =
   | 'IDLE' 
   | 'AWAITING_MOVEMENT_CONFIRMATION' 
   | 'AWAITING_ATTACK_TARGET' 
+  | 'AWAITING_WEAPON_TARGET'
   | 'AWAITING_SPELL_TARGET';
 
 export interface PlayerActionContext {
@@ -103,6 +105,20 @@ export interface UseCombatGameResult {
   
   // ✅ FONCTIONNALITÉ 3 - Journal narratif
   narratives: NarrativeMessageView[];
+  
+  // ✅ PHASE 2 - NOUVELLES FONCTIONS ARMES JOUEUR
+  getPlayerWeapons: () => PlayerWeaponChoice[];
+  selectWeaponAttack: (weaponId: string) => void;
+  executeWeaponAttack: (targetId: string) => Promise<void>;
+  
+  // ✅ NOUVELLES FONCTIONS FIN DE COMBAT
+  getPostCombatChoices: () => Promise<Array<{
+    id: string;
+    text: string;
+    targetSceneId: string;
+  }>>;
+  executePostCombatChoice: (choiceId: string, targetSceneId: string) => Promise<void>;
+  
 }
 
 /**
@@ -289,6 +305,61 @@ export function useCombatGame(): UseCombatGameResult {
     }
   }, [combatEngine, combatGameUseCase]);
 
+  // ✅ PHASE 2 - NOUVELLES FONCTIONS ARMES JOUEUR (selon plan_joueur.md ÉTAPE 2.1)
+  
+  const getPlayerWeapons = useCallback(() => {
+    if (!combatEngine || !isPlayerTurn) return [];
+    return combatGameUseCase.getPlayerWeaponChoices(combatEngine);
+  }, [combatEngine, isPlayerTurn, combatGameUseCase]);
+
+  const selectWeaponAttack = useCallback((weaponId: string) => {
+    if (!combatEngine || !isPlayerTurn) return;
+    
+    const validTargets = combatGameUseCase.getValidTargetsForPlayerWeapon(combatEngine, weaponId);
+    
+    setPlayerActionContext({
+      state: 'AWAITING_WEAPON_TARGET',
+      selectedWeapon: weaponId,
+      validTargets: validTargets.map(t => t.id)
+    });
+  }, [combatEngine, isPlayerTurn, combatGameUseCase]);
+
+  const executeWeaponAttack = useCallback(async (targetId: string) => {
+    if (!combatEngine || !playerActionContext.selectedWeapon) return;
+    
+    try {
+      const newCombat = await combatGameUseCase.executePlayerWeaponAttack(
+        combatEngine, 
+        playerActionContext.selectedWeapon, 
+        targetId
+      );
+      setCombatEngine(newCombat);
+      setPlayerActionContext({ state: 'IDLE' });
+    } catch (error) {
+      console.error('Weapon attack failed:', error);
+    }
+  }, [combatEngine, playerActionContext, combatGameUseCase]);
+
+  // ✅ NOUVELLES FONCTIONS FIN DE COMBAT - Délégation pure vers UseCase
+  const getPostCombatChoices = useCallback(async () => {
+    if (!combatEngine) return [];
+    return await combatGameUseCase.getPostCombatChoices(combatEngine);
+  }, [combatEngine, combatGameUseCase]);
+
+  const executePostCombatChoice = useCallback(async (choiceId: string, targetSceneId: string) => {
+    if (!combatEngine) return;
+    
+    try {
+      const success = await combatGameUseCase.executePostCombatChoice(choiceId, targetSceneId);
+      if (success) {
+        // Combat terminé, transition réussie
+        console.log(`Post-combat transition completed: ${choiceId} -> ${targetSceneId}`);
+      }
+    } catch (error) {
+      console.error('Post-combat choice failed:', error);
+    }
+  }, [combatEngine, combatGameUseCase]);
+
   return {
     // État
     combatState,
@@ -319,6 +390,15 @@ export function useCombatGame(): UseCombatGameResult {
     confirmAction,
     
     // ✅ FONCTIONNALITÉ 3 - Journal narratif
-    narratives
+    narratives,
+    
+    // ✅ PHASE 2 - NOUVELLES FONCTIONS ARMES JOUEUR
+    getPlayerWeapons,
+    selectWeaponAttack,
+    executeWeaponAttack,
+    
+    // ✅ NOUVELLES FONCTIONS FIN DE COMBAT
+    getPostCombatChoices,
+    executePostCombatChoice
   };
 }

@@ -3,6 +3,7 @@
  * Types purs pour les ennemis, sans dépendance externe
  */
 import type { Position, Stats } from './core';
+import type { AIProfile } from './AIProfile';
 
 export interface DomainEnemyDataSource {
   readonly id: string;
@@ -45,11 +46,10 @@ export interface DomainEnemyTemplate {
     readonly resistances?: readonly string[];
     readonly vulnerabilities?: readonly string[];
   };
-  readonly aiProfile?: {
-    readonly behavior: 'aggressive' | 'defensive' | 'tactical' | 'cowardly';
-    readonly preferredRange: 'melee' | 'ranged' | 'mixed';
-    readonly aggroRadius?: number;
-  };
+  /**
+   * Profil d'IA enrichi - système unifié
+   */
+  readonly aiProfile: AIProfile;
   readonly lootTable?: ReadonlyArray<{
     readonly itemId: string;
     readonly dropChance: number;

@@ -8,15 +8,15 @@ import type { Position } from '../types/core';
 
 export class TacticalCalculationService {
   /**
-   * Calcule la distance de Manhattan entre deux positions
-   * Utilisée pour le mouvement tactique en D&D (distance en cases)
+   * Calcule la distance de Chebyshev entre deux positions
+   * Distance tactique D&D : les diagonales comptent comme 1 case
    * 
    * @param from - Position de départ
    * @param to - Position d'arrivée
    * @returns Distance en cases
    */
   static calculateManhattanDistance(from: Position, to: Position): number {
-    return Math.abs(to.x - from.x) + Math.abs(to.y - from.y);
+    return Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y));
   }
 
   /**

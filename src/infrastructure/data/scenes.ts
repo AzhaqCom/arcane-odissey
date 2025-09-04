@@ -308,7 +308,7 @@ Au loin, vous apercevez un sentier qui s'enfonce dans les profondeurs de la for�
       {
         id: 'victory_continue',
         text: '🏆 Fouiller les corps et continuer plus profondément',
-        targetSceneId: 'forest_deeper',
+        targetSceneId: 'tavern_start',
         condition: { type: 'combat_result', value: 'victory' },
         effects: [
           { type: 'gain_xp', target: 'player', value: '150' },

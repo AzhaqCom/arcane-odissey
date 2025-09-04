@@ -77,6 +77,14 @@ export class WeaponResolutionService {
   }
 
   /**
+   * Récupérer une arme par son ID
+   * Méthode publique pour accès depuis CombatEngine
+   */
+  getWeapon(weaponId: string): Weapon | null {
+    return this.weaponRepository.getWeapon(weaponId);
+  }
+
+  /**
    * Vérifier si une entité peut utiliser une arme spécifique
    */
   canEntityUseWeapon(entity: CombatEntity, weapon: Weapon): boolean {
@@ -190,10 +198,13 @@ export class WeaponResolutionService {
   }
 
   private resolvePlayerWeapon(entity: CombatEntity): Weapon | null {
-    // TODO: Quand le système d'inventaire sera implémenté
-    // Récupérer l'arme équipée du joueur depuis son inventaire
+    // LIGNE 1: Utiliser équipement si défini (même logique que ennemis)
+    if (entity.equipment?.weapons && entity.equipment.weapons.length > 0) {
+      const weaponId = entity.equipment.weapons[0];
+      return this.weaponRepository.getWeapon(weaponId);
+    }
     
-    // Pour l'instant, retourner null (attaque à mains nues)
+    // LIGNE 2: Retourner null pour attaque à mains nues
     return null;
   }
 }
